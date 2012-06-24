@@ -70,20 +70,22 @@ struct space_allocation {
 
 /* entries for swap and var are changed by editor_allocspace() */
 const struct space_allocation alloc_big[] = {
-	{   MEG(80),         GIG(1),   5, "/"		},
-	{   MEG(80),       MEG(256),   5, "swap"	},
-	{  MEG(120),         GIG(4),   8, "/tmp"	},
-	{   MEG(80),         GIG(4),  13, "/var"	},
-	{  MEG(900),         GIG(2),   5, "/usr"	},
-	{  MEG(512),         GIG(1),   3, "/usr/X11R6"	},
-	{    GIG(2),        GIG(10),  10, "/usr/local"	},
-	{    GIG(1),         GIG(2),   2, "/usr/src"	},
+	{   MEG(80),         GIG(1),   5, "/"			},
+	{   MEG(80),       MEG(256),   5, "swap"		},
+	{  MEG(120),         GIG(4),   5, "/tmp"		},
+	{   MEG(80),        GIG(10),   8, "/var"		},
+	{  MEG(900),         GIG(2),   5, "/usr"		},
+	{  MEG(512),         GIG(1),   3, "/usr/X11R6"		},
+	{    GIG(2),         GIG(4),   4, "/usr/xenocara"	},
+	{    GIG(2),        GIG(32),  10, "/usr/local"		},
+	{    GIG(1),         GIG(8),   2, "/usr/src"		},
 #ifdef STATICLINKING
-	{ MEG(2600),         GIG(3),   4, "/usr/obj"	},
+	{ MEG(2600),         GIG(4),   4, "/usr/obj"		},
 #else
-	{ MEG(1300),         GIG(2),   4, "/usr/obj"	},
+	{    GIG(2),         GIG(4),   4, "/usr/obj"		},
 #endif
-	{    GIG(1),       GIG(300),  45, "/home"	}
+	{  MEG(512),         GIG(1),   4, "/usr/xobj"		},
+	{    GIG(1),       GIG(300),  45, "/home"		}
 	/* Anything beyond this leave for the user to decide */
 };
 
