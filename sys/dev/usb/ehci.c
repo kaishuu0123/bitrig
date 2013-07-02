@@ -663,7 +663,7 @@ ehci_softintr(void *v)
 
 	sc->sc_bus.intr_context--;
 
-	return (0);
+	return (1);
 }
 
 /* Check for an interrupt. */
