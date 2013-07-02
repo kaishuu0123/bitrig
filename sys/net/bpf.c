@@ -518,7 +518,7 @@ bpfwrite(dev_t dev, struct uio *uio, int ioflag)
 	struct bpf_d *d;
 	struct ifnet *ifp;
 	struct mbuf *m;
-	int error, s;
+	int error;
 	struct sockaddr_storage dst;
 
 	d = bpfilter_lookup(minor(dev));
@@ -548,10 +548,10 @@ bpfwrite(dev_t dev, struct uio *uio, int ioflag)
 	if (d->bd_hdrcmplt)
 		dst.ss_family = pseudo_AF_HDRCMPLT;
 
-	s = splsoftnet();
+	crit_enter();
 	error = (*ifp->if_output)(ifp, m, (struct sockaddr *)&dst,
 	    (struct rtentry *)0);
-	splx(s);
+	crit_leave();
 	/*
 	 * The driver frees the mbuf.
 	 */

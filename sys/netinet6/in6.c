@@ -75,6 +75,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -616,7 +617,6 @@ in6_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 	{
 		int i, error = 0;
 		struct nd_prefix pr0, *pr;
-		int s;
 
 		/* reject read-only flags */
 		if ((ifra->ifra_flags & IN6_IFF_DUPLICATED) != 0 ||
@@ -629,9 +629,9 @@ in6_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 		 * first, make or update the interface address structure,
 		 * and link it to the list.
 		 */
- 		s = splsoftnet();
+		crit_enter();
 		error = in6_update_ifa(ifp, ifra, ia);
-		splx(s);
+		crit_leave();
 		if (error != 0)
 			return (error);
 		if ((ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr))
@@ -743,7 +743,7 @@ in6_update_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	struct rtentry *rt;
 	char addr[INET6_ADDRSTRLEN];
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	/* Validate parameters */
 	if (ifp == NULL || ifra == NULL) /* this maybe redundant */
@@ -1563,7 +1563,6 @@ in6_addmulti(struct in6_addr *maddr6, struct ifnet *ifp, int *errorp)
 {
 	struct	in6_ifreq ifr;
 	struct	in6_multi *in6m;
-	int	s;
 
 	*errorp = 0;
 	/*
@@ -1609,10 +1608,10 @@ in6_addmulti(struct in6_addr *maddr6, struct ifnet *ifp, int *errorp)
 			return (NULL);
 		}
 
-		s = splsoftnet();
+		crit_enter();
 		TAILQ_INSERT_HEAD(&ifp->if_maddrlist, &in6m->in6m_ifma,
 		    ifma_list);
-		splx(s);
+		crit_leave();
 
 		/*
 		 * Let MLD6 know that we have joined a new IP6 multicast
@@ -1632,7 +1631,6 @@ in6_delmulti(struct in6_multi *in6m)
 {
 	struct	in6_ifreq ifr;
 	struct 	ifnet *ifp;
-	int	s;
 
 	if (--in6m->in6m_refcnt == 0) {
 		/*
@@ -1652,9 +1650,9 @@ in6_delmulti(struct in6_multi *in6m)
 		ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 		(*ifp->if_ioctl)(in6m->in6m_ifp, SIOCDELMULTI, (caddr_t)&ifr);
 
-		s = splsoftnet();
+		crit_enter();
 		TAILQ_REMOVE(&ifp->if_maddrlist, &in6m->in6m_ifma, ifma_list);
-		splx(s);
+		crit_leave();
 
 		free(in6m, M_IPMADDR);
 	}

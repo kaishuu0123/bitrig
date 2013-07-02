@@ -46,6 +46,7 @@
 #include <sys/syslog.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/proc.h>
 
 #include <sys/timeout.h>
 #include <crypto/md5.h>
@@ -1983,10 +1984,10 @@ sppp_lcp_up(struct sppp *sp)
 	struct timeval tv;
 
 	if (sp->pp_flags & PP_CISCO) {
-		int s = splsoftnet();
+		crit_enter();
 		sp->pp_if.if_link_state = LINK_STATE_UP;
 		if_link_state_change(&sp->pp_if);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -2036,10 +2037,10 @@ sppp_lcp_down(struct sppp *sp)
 	STDDCL;
 
 	if (sp->pp_flags & PP_CISCO) {
-		int s = splsoftnet();
+		crit_enter();
 		sp->pp_if.if_link_state = LINK_STATE_DOWN;
 		if_link_state_change(&sp->pp_if);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -4590,7 +4591,6 @@ sppp_set_ip_addrs(void *arg1, void *arg2)
 	struct ifaddr *ifa;
 	struct sockaddr_in *si;
 	struct sockaddr_in *dest;
-	int s;
 	
 	sppp_get_ip_addrs(sp, &myaddr, &hisaddr, NULL);
 	if ((sp->ipcp.flags & IPCP_MYADDR_DYN) &&
@@ -4600,7 +4600,7 @@ sppp_set_ip_addrs(void *arg1, void *arg2)
 	    (sp->ipcp.flags & IPCP_HISADDR_SEEN))
 		hisaddr = sp->ipcp.req_hisaddr;
 
-	s = splsoftnet();
+	crit_enter();
 
 	/*
 	 * Pick the first AF_INET address from the list,
@@ -4640,12 +4640,12 @@ sppp_set_ip_addrs(void *arg1, void *arg2)
 		if (debug && error) {
 			log(LOG_DEBUG, SPP_FMT "sppp_set_ip_addrs: in_ifinit "
 			" failed, error=%d\n", SPP_ARGS(ifp), error);
-			splx(s);
+			crit_leave();
 			return;
 		}
 		sppp_update_gw(ifp);
 	}
-	splx(s);
+	crit_leave();
 }
 
 /*
@@ -4662,9 +4662,8 @@ sppp_clear_ip_addrs(void *arg1, void *arg2)
 	struct sockaddr_in *si;
 	struct sockaddr_in *dest;
 	u_int32_t remote;
-	int s;
 
-	s = splsoftnet();
+	crit_enter();
 
 	if (sp->ipcp.flags & IPCP_HISADDR_DYN)
 		remote = sp->ipcp.saved_hisaddr;
@@ -4701,12 +4700,12 @@ sppp_clear_ip_addrs(void *arg1, void *arg2)
 		if (debug && error) {
 			log(LOG_DEBUG, SPP_FMT "sppp_clear_ip_addrs: in_ifinit "
 			" failed, error=%d\n", SPP_ARGS(ifp), error);
-			splx(s);
+			crit_leave();
 			return;
 		}
 		sppp_update_gw(ifp);
 	}
-	splx(s);
+	crit_leave();
 }
 
 
@@ -5235,7 +5234,7 @@ HIDE void
 sppp_set_phase(struct sppp *sp)
 {
 	STDDCL;
-	int lstate, s;
+	int lstate;
 
 	if (debug)
 		log(LOG_INFO, SPP_FMT "phase %s\n", SPP_ARGS(ifp),
@@ -5249,8 +5248,8 @@ sppp_set_phase(struct sppp *sp)
 
 	if (ifp->if_link_state != lstate) {
 		ifp->if_link_state = lstate;
-		s = splsoftnet();
+		crit_enter();
 		if_link_state_change(ifp);
-		splx(s);
+		crit_leave();
 	}
 }

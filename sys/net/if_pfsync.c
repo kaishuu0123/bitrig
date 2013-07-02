@@ -54,6 +54,7 @@
 #include <sys/sysctl.h>
 #include <sys/pool.h>
 #include <sys/syslog.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -354,9 +355,8 @@ pfsync_clone_destroy(struct ifnet *ifp)
 {
 	struct pfsync_softc *sc = ifp->if_softc;
 	struct pfsync_deferral *pd;
-	int s;
 
-	s = splsoftnet();
+	crit_enter();
 	timeout_del(&sc->sc_bulkfail_tmo);
 	timeout_del(&sc->sc_bulk_tmo);
 	timeout_del(&sc->sc_tmo);
@@ -385,7 +385,7 @@ pfsync_clone_destroy(struct ifnet *ifp)
 	free(sc, M_DEVBUF);
 
 	pfsyncif = NULL;
-	splx(s);
+	crit_leave();
 
 	return (0);
 }
@@ -1199,7 +1199,6 @@ void
 pfsync_update_net_tdb(struct pfsync_tdb *pt)
 {
 	struct tdb		*tdb;
-	int			 s;
 
 	/* check for invalid values */
 	if (ntohl(pt->spi) <= SPI_RESERVED_MAX ||
@@ -1207,7 +1206,7 @@ pfsync_update_net_tdb(struct pfsync_tdb *pt)
 	     pt->dst.sa.sa_family != AF_INET6))
 		goto bad;
 
-	s = splsoftnet();
+	crit_enter();
 	tdb = gettdb(ntohs(pt->rdomain), pt->spi, &pt->dst, pt->sproto);
 	if (tdb) {
 		pt->rpl = betoh64(pt->rpl);
@@ -1216,14 +1215,14 @@ pfsync_update_net_tdb(struct pfsync_tdb *pt)
 		/* Neither replay nor byte counter should ever decrease. */
 		if (pt->rpl < tdb->tdb_rpl ||
 		    pt->cur_bytes < tdb->tdb_cur_bytes) {
-			splx(s);
+			crit_leave();
 			goto bad;
 		}
 
 		tdb->tdb_rpl = pt->rpl;
 		tdb->tdb_cur_bytes = pt->cur_bytes;
 	}
-	splx(s);
+	crit_leave();
 	return;
 
  bad:
@@ -1699,7 +1698,7 @@ pfsync_insert_state(struct pf_state *st)
 {
 	struct pfsync_softc *sc = pfsyncif;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	if (ISSET(st->rule.ptr->rule_flag, PFRULE_NOSYNC) ||
 	    st->key[PF_SK_WIRE]->proto == IPPROTO_PFSYNC) {
@@ -1729,7 +1728,7 @@ pfsync_defer(struct pf_state *st, struct mbuf *m)
 	struct pfsync_softc *sc = pfsyncif;
 	struct pfsync_deferral *pd;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	if (!sc->sc_defer ||
 	    ISSET(st->state_flags, PFSTATE_NOSYNC) ||
@@ -1768,7 +1767,7 @@ pfsync_undefer(struct pfsync_deferral *pd, int drop)
 {
 	struct pfsync_softc *sc = pfsyncif;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	TAILQ_REMOVE(&sc->sc_deferrals, pd, pd_entry);
 	sc->sc_deferred--;
@@ -1818,11 +1817,9 @@ pfsync_undefer(struct pfsync_deferral *pd, int drop)
 void
 pfsync_defer_tmo(void *arg)
 {
-	int s;
-
-	s = splsoftnet();
+	crit_enter();
 	pfsync_undefer(arg, 0);
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -1831,7 +1828,7 @@ pfsync_deferred(struct pf_state *st, int drop)
 	struct pfsync_softc *sc = pfsyncif;
 	struct pfsync_deferral *pd;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	TAILQ_FOREACH(pd, &sc->sc_deferrals, pd_entry) {
 		 if (pd->pd_st == st) {
@@ -1850,7 +1847,7 @@ pfsync_update_state(struct pf_state *st)
 	struct pfsync_softc *sc = pfsyncif;
 	int sync = 0;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	if (sc == NULL || !ISSET(sc->sc_if.if_flags, IFF_RUNNING))
 		return;
@@ -2019,7 +2016,7 @@ pfsync_delete_state(struct pf_state *st)
 {
 	struct pfsync_softc *sc = pfsyncif;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	if (sc == NULL || !ISSET(sc->sc_if.if_flags, IFF_RUNNING))
 		return;
@@ -2066,7 +2063,7 @@ pfsync_clear_states(u_int32_t creatorid, const char *ifname)
 		struct pfsync_clr clr;
 	} __packed r;
 
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	if (sc == NULL || !ISSET(sc->sc_if.if_flags, IFF_RUNNING))
 		return;
@@ -2236,9 +2233,8 @@ pfsync_bulk_update(void *arg)
 	struct pfsync_softc *sc = arg;
 	struct pf_state *st;
 	int i = 0;
-	int s;
 
-	s = splsoftnet();
+	crit_enter();
 
 	st = sc->sc_bulk_next;
 
@@ -2271,7 +2267,7 @@ pfsync_bulk_update(void *arg)
 		}
 	}
 
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -2301,9 +2297,8 @@ void
 pfsync_bulk_fail(void *arg)
 {
 	struct pfsync_softc *sc = arg;
-	int s;
 
-	s = splsoftnet();
+	crit_enter();
 
 	if (sc->sc_bulk_tries++ < PFSYNC_MAX_BULKTRIES) {
 		/* Try again */
@@ -2330,7 +2325,7 @@ pfsync_bulk_fail(void *arg)
 		DPFPRINTF(LOG_ERR, "failed to receive bulk update");
 	}
 
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -2377,11 +2372,9 @@ pfsync_state_in_use(struct pf_state *st)
 void
 pfsync_timeout(void *arg)
 {
-	int s;
-
-	s = splsoftnet();
+	crit_enter();
 	pfsync_sendout();
-	splx(s);
+	crit_leave();
 }
 
 /* this is a softnet/netisr handler */

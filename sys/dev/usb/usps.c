@@ -308,11 +308,11 @@ int
 usps_detach(struct device *self, int flags)
 {
 	struct usps_softc *sc = (struct usps_softc *)self;
-	int i, rv = 0, s;
+	int i, rv = 0;
 
 	usbd_deactivate(sc->sc_udev);
 
-	s = splusb();
+	crit_enter();
 	if (sc->sc_ipipe != NULL) {
 		usbd_abort_pipe(sc->sc_ipipe);
 		usbd_close_pipe(sc->sc_ipipe);
@@ -322,7 +322,7 @@ usps_detach(struct device *self, int flags)
 	}
 	if (sc->sc_xfer != NULL)
 		usbd_free_xfer(sc->sc_xfer);
-	splx(s);
+	crit_leave();
 
 	wakeup(&sc->sc_sensortask);
 	sensordev_deinstall(&sc->sc_sensordev);

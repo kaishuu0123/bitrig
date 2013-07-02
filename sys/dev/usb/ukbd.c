@@ -423,9 +423,9 @@ ukbd_cnpollc(void *v, int on)
 	DPRINTFN(2,("ukbd_cnpollc: sc=%p on=%d\n", v, on));
 
 	if (on)
-		sc->sc_spl = splusb();
+		crit_enter();
 	else
-		splx(sc->sc_spl);
+		crit_leave();
 	usbd_set_polling(sc->sc_hdev.sc_udev, on);
 }
 

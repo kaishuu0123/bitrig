@@ -46,6 +46,7 @@
 #include <sys/device.h>
 #include <sys/tty.h>
 #include <sys/file.h>
+#include <sys/proc.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbhid.h>
@@ -292,12 +293,11 @@ void
 ucycom_close(void *addr, int portno)
 {
 	struct ucycom_softc *sc = addr;
-	int s;
 
 	if (usbd_is_dying(sc->sc_udev))
 		return;
 
-	s = splusb();
+	crit_enter();
 	if (sc->sc_obuf != NULL) {
 		free(sc->sc_obuf, M_USBDEV);
 		sc->sc_obuf = NULL;
@@ -306,7 +306,7 @@ ucycom_close(void *addr, int portno)
 		free(sc->sc_ibuf, M_USBDEV);
 		sc->sc_ibuf = NULL;
 	}
-	splx(s);
+	crit_leave();
 }
 
 void

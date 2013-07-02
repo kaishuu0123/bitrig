@@ -43,6 +43,7 @@
 #include <sys/syslog.h>
 #include <sys/queue.h>
 #include <sys/timeout.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -815,7 +816,6 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 			 */
 			struct nd_defrouter *dr;
 			struct in6_addr *in6;
-			int s;
 
 			in6 = &satosin6(rt_key(rt))->sin6_addr;
 
@@ -825,7 +825,7 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 			 * is only called under the network software interrupt
 			 * context.  However, we keep it just for safety.
 			 */
-			s = splsoftnet();
+			crit_enter();
 			dr = defrouter_lookup(in6, rt->rt_ifp);
 			if (dr)
 				defrtrlist_del(dr);
@@ -839,7 +839,7 @@ nd6_na_input(struct mbuf *m, int off, int icmp6len)
 				 */
 				rt6_flush(&ip6->ip6_src, rt->rt_ifp);
 			}
-			splx(s);
+			crit_leave();
 		}
 		ln->ln_router = is_router;
 	}
@@ -1236,12 +1236,11 @@ nd6_dad_stop(struct ifaddr *ifa)
 void
 nd6_dad_timer(struct ifaddr *ifa)
 {
-	int s;
 	struct in6_ifaddr *ia = ifatoia6(ifa);
 	struct dadq *dp;
 	char addr[INET6_ADDRSTRLEN];
 
-	s = splsoftnet();		/* XXX */
+	crit_enter();		/* XXX */
 
 	/* Sanity check */
 	if (ia == NULL) {
@@ -1339,7 +1338,7 @@ nd6_dad_timer(struct ifaddr *ifa)
 	}
 
 done:
-	splx(s);
+	crit_leave();
 }
 
 void

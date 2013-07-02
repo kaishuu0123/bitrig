@@ -66,6 +66,7 @@
 #include <sys/socket.h>
 #include <sys/timeout.h>
 #include <sys/device.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -544,7 +545,6 @@ cue_detach(struct device *self, int flags)
 {
 	struct cue_softc	*sc = (struct cue_softc *)self;
 	struct ifnet		*ifp = GET_IFP(sc);
-	int			s;
 
 	DPRINTFN(2,("%s: %s: enter\n", sc->cue_dev.dv_xname, __func__));
 
@@ -558,7 +558,7 @@ cue_detach(struct device *self, int flags)
 	usb_rem_task(sc->cue_udev, &sc->cue_tick_task);
 	usb_rem_task(sc->cue_udev, &sc->cue_stop_task);
 
-	s = splusb();
+	crit_enter();
 
 	if (ifp->if_flags & IFF_RUNNING)
 		cue_stop(sc);
@@ -576,7 +576,7 @@ cue_detach(struct device *self, int flags)
 		       sc->cue_dev.dv_xname);
 #endif
 
-	splx(s);
+	crit_leave();
 
 	return (0);
 }
@@ -1147,7 +1147,6 @@ cue_watchdog(struct ifnet *ifp)
 	struct cue_softc	*sc = ifp->if_softc;
 	struct cue_chain	*c;
 	usbd_status		stat;
-	int			s;
 
 	DPRINTFN(5,("%s: %s: enter\n", sc->cue_dev.dv_xname,__func__));
 
@@ -1157,14 +1156,14 @@ cue_watchdog(struct ifnet *ifp)
 	ifp->if_oerrors++;
 	printf("%s: watchdog timeout\n", sc->cue_dev.dv_xname);
 
-	s = splusb();
+	crit_enter();
 	c = &sc->cue_cdata.cue_tx_chain[0];
 	usbd_get_xfer_status(c->cue_xfer, NULL, NULL, NULL, &stat);
 	cue_txeof(c->cue_xfer, c, stat);
 
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		cue_start(ifp);
-	splx(s);
+	crit_leave();
 }
 
 /*

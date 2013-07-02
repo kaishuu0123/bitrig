@@ -66,6 +66,7 @@
 #include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_var.h>
@@ -201,7 +202,6 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 	struct sockaddr_in oldaddr;
 	int error;
 	int newifaddr;
-	int s;
 
 	switch (cmd) {
 	case SIOCALIFADDR:
@@ -315,13 +315,13 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 	case SIOCSIFDSTADDR:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			return (EINVAL);
-		s = splsoftnet();
+		crit_enter();
 		oldaddr = ia->ia_dstaddr;
 		ia->ia_dstaddr = *satosin(&ifr->ifr_dstaddr);
 		if (ifp->if_ioctl && (error = (*ifp->if_ioctl)
 					(ifp, SIOCSIFDSTADDR, (caddr_t)ia))) {
 			ia->ia_dstaddr = oldaddr;
-			splx(s);
+			crit_leave();
 			return (error);
 		}
 		if (ia->ia_flags & IFA_ROUTE) {
@@ -330,7 +330,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 			ia->ia_ifa.ifa_dstaddr = sintosa(&ia->ia_dstaddr);
 			rtinit(&(ia->ia_ifa), (int)RTM_ADD, RTF_HOST|RTF_UP);
 		}
-		splx(s);
+		crit_leave();
 		break;
 
 	case SIOCSIFBRDADDR:
@@ -340,12 +340,12 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 		break;
 
 	case SIOCSIFADDR:
-		s = splsoftnet();
+		crit_enter();
 		in_ifscrub(ifp, ia);
 		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), newifaddr);
 		if (!error)
 			dohooks(ifp->if_addrhooks, 0);
-		splx(s);
+		crit_leave();
 		return (error);
 
 	case SIOCSIFNETMASK:
@@ -358,7 +358,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 
 		error = 0;
 
-		s = splsoftnet();
+		crit_enter();
 		if (ia->ia_addr.sin_family == AF_INET) {
 			if (ifra->ifra_addr.sin_len == 0)
 				ifra->ifra_addr = ia->ia_addr;
@@ -391,7 +391,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 		}
 		if (!error)
 			dohooks(ifp->if_addrhooks, 0);
-		splx(s);
+		crit_leave();
 		return (error);
 		}
 	case SIOCDIFADDR:
@@ -401,10 +401,10 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 		 * should happen to a packet that was routed after
 		 * the scrub but before the other steps? 
 		 */
-		s = splsoftnet();
+		crit_enter();
 		in_purgeaddr(&ia->ia_ifa);
 		dohooks(ifp->if_addrhooks, 0);
-		splx(s);
+		crit_leave();
 		break;
 
 #ifdef MROUTING
@@ -654,7 +654,7 @@ in_ifinit(struct ifnet *ifp, struct in_ifaddr *ia, struct sockaddr_in *sin,
 	 * Is the "ifp" even in a consistent state?
 	 * Be safe for now.
 	 */
-	splsoftassert(IPL_SOFTNET);
+	crit_assert();
 
 	if (ia->ia_netmask == 0) {
 		if (IN_CLASSA(i))
@@ -922,7 +922,6 @@ in_addmulti(struct in_addr *ap, struct ifnet *ifp)
 {
 	struct in_multi *inm;
 	struct ifreq ifr;
-	int s;
 
 	/*
 	 * See if address already in list.
@@ -962,10 +961,10 @@ in_addmulti(struct in_addr *ap, struct ifnet *ifp)
 			return (NULL);
 		}
 
-		s = splsoftnet();
+		crit_enter();
 		TAILQ_INSERT_HEAD(&ifp->if_maddrlist, &inm->inm_ifma,
 		    ifma_list);
-		splx(s);
+		crit_leave();
 
 		/*
 		 * Let IGMP know that we have joined a new IP multicast group.
@@ -984,7 +983,6 @@ in_delmulti(struct in_multi *inm)
 {
 	struct ifreq ifr;
 	struct ifnet *ifp;
-	int s;
 
 	if (--inm->inm_refcnt == 0) {
 		/*
@@ -1003,9 +1001,9 @@ in_delmulti(struct in_multi *inm)
 		satosin(&ifr.ifr_addr)->sin_addr = inm->inm_addr;
 		(*ifp->if_ioctl)(ifp, SIOCDELMULTI, (caddr_t)&ifr);
 
-		s = splsoftnet();
+		crit_enter();
 		TAILQ_REMOVE(&ifp->if_maddrlist, &inm->inm_ifma, ifma_list);
-		splx(s);
+		crit_leave();
 
 		free(inm, M_IPMADDR);
 	}
