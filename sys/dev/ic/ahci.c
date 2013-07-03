@@ -929,12 +929,12 @@ ahci_port_softreset(struct ahci_port *ap)
 	struct ahci_ccb			*ccb = NULL;
 	struct ahci_cmd_hdr		*cmd_slot;
 	u_int8_t			*fis;
-	int				s, rc = EIO, oldstate;
+	int				rc = EIO, oldstate;
 	u_int32_t			cmd;
 
 	DPRINTF(AHCI_D_VERBOSE, "%s: soft reset\n", PORTNAME(ap));
 
-	s = splbio();
+	crit_enter();
 	oldstate = ap->ap_state;
 	ap->ap_state = AP_S_ERROR_RECOVERY;
 
@@ -1034,7 +1034,7 @@ err:
 	ahci_pwrite(ap, AHCI_PREG_CMD, cmd);
 	ap->ap_state = oldstate;
 
-	splx(s);
+	crit_leave();
 
 	return (rc);
 }
@@ -1046,7 +1046,6 @@ ahci_pmp_port_softreset(struct ahci_port *ap, int pmp_port)
 	u_int32_t		data;
 	int			count;
 	int			rc;
-	int			s;
 	struct ahci_cmd_hdr	*cmd_slot;
 	u_int8_t		*fis;
 
@@ -1054,7 +1053,7 @@ ahci_pmp_port_softreset(struct ahci_port *ap, int pmp_port)
 	 * devices (AHCI section 9.3.8)
 	 */
 
-	s = splbio();
+	crit_enter();
 	/* ignore spurious IFS errors while resetting */
 	DPRINTF(AHCI_D_VERBOSE, "%s: now ignoring IFS\n", PORTNAME(ap));
 	ap->ap_pmp_ignore_ifs = 1;
@@ -1148,7 +1147,7 @@ ahci_pmp_port_softreset(struct ahci_port *ap, int pmp_port)
 	ahci_pwrite(ap, AHCI_PREG_IS, AHCI_PREG_IS_IFS);
 	ap->ap_pmp_ignore_ifs = 0;
 	DPRINTF(AHCI_D_VERBOSE, "%s: no longer ignoring IFS\n", PORTNAME(ap));
-	splx(s);
+	crit_leave();
 
 	return (rc);
 }
@@ -1273,9 +1272,8 @@ ahci_pmp_port_portreset(struct ahci_port *ap, int pmp_port)
 	u_int32_t cmd, data;
 	int loop;
 	int rc = 1;
-	int s;
 
-	s = splbio();
+	crit_enter();
 	DPRINTF(AHCI_D_VERBOSE, "%s.%d: PMP port reset\n", PORTNAME(ap),
 	    pmp_port);
 
@@ -1356,7 +1354,7 @@ ahci_pmp_port_portreset(struct ahci_port *ap, int pmp_port)
 
 	rc = 0;
 err:
-	splx(s);
+	crit_leave();
 	return (rc);
 }
 
@@ -1365,9 +1363,9 @@ int
 ahci_port_portreset(struct ahci_port *ap, int pmp)
 {
 	u_int32_t			cmd, r;
-	int				rc, s;
+	int				s;
 
-	s = splbio();
+	crit_enter();
 	DPRINTF(AHCI_D_VERBOSE, "%s: port reset\n", PORTNAME(ap));
 
 	/* Save previous command register state */
@@ -1428,7 +1426,7 @@ ahci_port_portreset(struct ahci_port *ap, int pmp)
 err:
 	/* Restore preserved port state */
 	ahci_pwrite(ap, AHCI_PREG_CMD, cmd);
-	splx(s);
+	crit_leave();
 
 	return (rc);
 }
@@ -1727,14 +1725,13 @@ int
 ahci_poll(struct ahci_ccb *ccb, int timeout, void (*timeout_fn)(void *))
 {
 	struct ahci_port		*ap = ccb->ccb_port;
-	int				s;
 
-	s = splbio();
+	crit_enter();
 	ahci_start(ccb);
 	do {
 		if (ISSET(ahci_port_intr(ap, AHCI_PREG_CI_ALL_SLOTS),
 		    1 << ccb->ccb_slot)) {
-			splx(s);
+			crit_leave();
 			return (0);
 		}
 		if (ccb->ccb_xa.state == ATA_S_ERROR) {
@@ -1744,7 +1741,7 @@ ahci_poll(struct ahci_ccb *ccb, int timeout, void (*timeout_fn)(void *))
 			if (timeout_fn != NULL) {
 				timeout_fn(ccb);
 			}
-			splx(s);
+			crit_leave();
 			return (1);
 		}
 
@@ -1755,7 +1752,7 @@ ahci_poll(struct ahci_ccb *ccb, int timeout, void (*timeout_fn)(void *))
 	if (timeout_fn != NULL)
 		timeout_fn(ccb);
 
-	splx(s);
+	crit_leave();
 
 	return (1);
 }
@@ -2745,7 +2742,6 @@ ahci_ata_cmd(struct ata_xfer *xa)
 {
 	struct ahci_ccb			*ccb = (struct ahci_ccb *)xa;
 	struct ahci_cmd_hdr		*cmd_slot;
-	int				s;
 
 	if (ccb->ccb_port->ap_state == AP_S_FATAL_ERROR)
 		goto failcmd;
@@ -2773,19 +2769,19 @@ ahci_ata_cmd(struct ata_xfer *xa)
 	if (xa->flags & ATA_F_POLL)
 		ahci_poll(ccb, xa->timeout, ahci_ata_cmd_timeout);
 	else {
-		s = splbio();
+		crit_enter();
 		timeout_add_msec(&xa->stimeout, xa->timeout);
 		ahci_start(ccb);
-		splx(s);
+		crit_leave();
 	}
 
 	return;
 
 failcmd:
-	s = splbio();
+	crit_enter();
 	xa->state = ATA_S_ERROR;
 	ata_complete(xa);
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -2832,10 +2828,10 @@ ahci_ata_cmd_timeout(void *arg)
 	struct ahci_ccb			*ccb = arg;
 	struct ata_xfer			*xa = &ccb->ccb_xa;
 	struct ahci_port		*ap = ccb->ccb_port;
-	int				s, ccb_was_started, ncq_cmd;
+	int				ccb_was_started, ncq_cmd;
 	volatile u_int32_t		*active;
 
-	s = splbio();
+	crit_enter();
 
 	ncq_cmd = (xa->flags & ATA_F_NCQ);
 	active = ncq_cmd ? &ap->ap_sactive : &ap->ap_active;
@@ -2910,9 +2906,9 @@ ahci_ata_cmd_timeout(void *arg)
 	DPRINTF(AHCI_D_TIMEOUT, "%s: run completion (2)\n", PORTNAME(ap));
 	ata_complete(xa);
 
-	DPRINTF(AHCI_D_TIMEOUT, "%s: splx\n", PORTNAME(ap));
+	DPRINTF(AHCI_D_TIMEOUT, "%s: crit_leave\n", PORTNAME(ap));
 ret:
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -3016,9 +3012,8 @@ ahci_pmp_identify(struct ahci_port *ap, int *ret_nports)
 	u_int32_t nports;
 	u_int32_t features;
 	u_int32_t enabled;
-	int s;
 
-	s = splbio();
+	crit_enter();
 
 	if (ahci_pmp_read(ap, 15, 0, &chipid) ||
 	    ahci_pmp_read(ap, 15, 1, &rev) ||
@@ -3027,10 +3022,10 @@ ahci_pmp_identify(struct ahci_port *ap, int *ret_nports)
 	    ahci_pmp_read(ap, 15, SATA_PMREG_FEAEN, &enabled)) {
 		printf("%s: port multiplier identification failed\n",
 		    PORTNAME(ap));
-		splx(s);
+		crit_leave();
 		return (1);
 	}
-	splx(s);
+	crit_leave();
 
 	nports &= 0x0F;
 

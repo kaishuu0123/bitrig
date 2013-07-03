@@ -1095,8 +1095,7 @@ hibernate_block_io(union hibernate_info *hib, daddr_t blkctr,
 void
 hibernate_resume(void)
 {
-	union hibernate_info hib;
-	int s;
+	union hibernate_info hiber_info;
 
 	/* Get current running machine's hibernate info */
 	bzero(&hib, sizeof(hib));
@@ -1106,7 +1105,7 @@ hibernate_resume(void)
 	}
 
 	/* Read hibernate info from disk */
-	s = splbio();
+	crit_enter();
 
 	DPRINTF("reading hibernate signature block location: %lld\n",
 		hib.sig_offset);
@@ -1123,7 +1122,7 @@ hibernate_resume(void)
 	if (disk_hib.magic != HIBERNATE_MAGIC) {
 		DPRINTF("wrong magic number in hibernate signature: %x\n",
 			disk_hib.magic);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1133,7 +1132,7 @@ hibernate_resume(void)
 	 */
 	if (hibernate_clear_signature()) {
 		DPRINTF("error clearing hibernate signature block\n");
-		splx(s);
+		crit_leave();
 		return;
 	}
 

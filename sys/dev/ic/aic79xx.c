@@ -7917,17 +7917,15 @@ ahd_reset_poll(void *arg)
 {
 	struct	ahd_softc *ahd;
 	u_int	scsiseq1;
-	int	l;
-	int	s;
 	
-	ahd_list_lock(&l);
+	ahd_list_lock();
 	ahd = ahd_find_softc((struct ahd_softc *)arg);
 	if (ahd == NULL) {
 		printf("ahd_reset_poll: Instance %p no longer exists\n", arg);
-		ahd_list_unlock(&l);
+		ahd_list_unlock();
 		return;
 	}
-	ahd_lock(ahd, &s);
+	ahd_lock(ahd);
 	ahd_pause(ahd);
 	ahd_update_modes(ahd);
 	ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
@@ -7936,8 +7934,8 @@ ahd_reset_poll(void *arg)
 		aic_timer_reset(&ahd->reset_timer, AHD_RESET_POLL_MS,
 				ahd_reset_poll, ahd);
 		ahd_unpause(ahd);
-		ahd_unlock(ahd, &s);
-		ahd_list_unlock(&l);
+		ahd_unlock(ahd);
+		ahd_list_unlock();
 		return;
 	}
 
@@ -7947,9 +7945,9 @@ ahd_reset_poll(void *arg)
 	ahd_outb(ahd, SCSISEQ1, scsiseq1 & (ENSELI|ENRSELI|ENAUTOATNP));
 	ahd_unpause(ahd);
 	ahd->flags &= ~AHD_RESET_POLL_ACTIVE;
-	ahd_unlock(ahd, &s);
+	ahd_unlock(ahd);
 	aic_release_simq(ahd);
-	ahd_list_unlock(&l);
+	ahd_list_unlock();
 }
 
 /**************************** Statistics Processing ***************************/
@@ -7957,18 +7955,16 @@ void
 ahd_stat_timer(void *arg)
 {
 	struct	ahd_softc *ahd;
-	int 	l;
-	int	s;
 	int	enint_coal;
 	
-	ahd_list_lock(&l);
+	ahd_list_lock();
 	ahd = ahd_find_softc((struct ahd_softc *)arg);
 	if (ahd == NULL) {
 		printf("ahd_stat_timer: Instance %p no longer exists\n", arg);
-		ahd_list_unlock(&l);
+		ahd_list_unlock();
 		return;
 	}
-	ahd_lock(ahd, &s);
+	ahd_lock(ahd);
 
 	enint_coal = ahd->hs_mailbox & ENINT_COALESCE;
 	if (ahd->cmdcmplt_total > ahd->int_coalescing_threshold)
@@ -7993,8 +7989,8 @@ ahd_stat_timer(void *arg)
 	ahd->cmdcmplt_counts[ahd->cmdcmplt_bucket] = 0;
 	aic_timer_reset(&ahd->stat_timer, AHD_STAT_UPDATE_MS,
 			ahd_stat_timer, ahd);
-	ahd_unlock(ahd, &s);
-	ahd_list_unlock(&l);
+	ahd_unlock(ahd);
+	ahd_list_unlock();
 }
 
 /****************************** Status Processing *****************************/
@@ -9122,7 +9118,6 @@ ahd_timeout(void *arg)
 	struct scb *scb, *list_scb;
 	struct ahd_softc *ahd;
 	char channel;
-	long s;
 	int found;
 #ifdef AHD_DEBUG
 	int was_paused;
@@ -9131,7 +9126,7 @@ ahd_timeout(void *arg)
 	scb = (struct scb *)arg;
 	ahd = scb->ahd_softc;
 
-	ahd_lock(ahd, &s);
+	ahd_lock(ahd);
 
 #ifdef AHD_DEBUG
 	was_paused = ahd_is_paused(ahd);
@@ -9162,7 +9157,7 @@ ahd_timeout(void *arg)
 	}
 
 	ahd_unpause(ahd);
-	ahd_unlock(ahd, &s);
+	ahd_unlock(ahd);
 }
 
 /**************************** Flexport Logic **********************************/
@@ -9529,13 +9524,12 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 	 */
 	if ((ahd->flags & AHD_TARGETROLE) == 0
 	 && ccb->ccb_h.target_id != CAM_TARGET_WILDCARD) {
-		int	s;
 
 		printf("Configuring Target Mode\n");
-		ahd_lock(ahd, &s);
+		ahd_lock(ahd);
 		if (LIST_FIRST(&ahd->pending_scbs) != NULL) {
 			ccb->ccb_h.status = CAM_BUSY;
-			ahd_unlock(ahd, &s);
+			ahd_unlock(ahd);
 			return;
 		}
 		ahd->flags |= AHD_TARGETROLE;
@@ -9544,7 +9538,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 		ahd_pause(ahd);
 		ahd_loadseq(ahd);
 		ahd_restart(ahd);
-		ahd_unlock(ahd, &s);
+		ahd_unlock(ahd);
 	}
 	cel = &ccb->cel;
 	target = ccb->ccb_h.target_id;
@@ -9609,7 +9603,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 		}
 		SLIST_INIT(&lstate->accept_tios);
 		SLIST_INIT(&lstate->immed_notifies);
-		ahd_lock(ahd, &s);
+		ahd_lock(ahd);
 		ahd_pause(ahd);
 		if (target != CAM_TARGET_WILDCARD) {
 			tstate->enabled_luns[lun] = lstate;
@@ -9668,7 +9662,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 			ahd_outb(ahd, SCSISEQ1, scsiseq1);
 		}
 		ahd_unpause(ahd);
-		ahd_unlock(ahd, &s);
+		ahd_unlock(ahd);
 		ccb->ccb_h.status = CAM_REQ_CMP;
 		xpt_print_path(ccb->ccb_h.path);
 		printf("Lun now enabled for target mode\n");
@@ -9681,7 +9675,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 			return;
 		}
 
-		ahd_lock(ahd, &s);
+		ahd_lock(ahd);
 		
 		ccb->ccb_h.status = CAM_REQ_CMP;
 		LIST_FOREACH(scb, &ahd->pending_scbs, pending_links) {
@@ -9692,7 +9686,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 			 && !xpt_path_comp(ccbh->path, ccb->ccb_h.path)){
 				printf("CTIO pending\n");
 				ccb->ccb_h.status = CAM_REQ_INVALID;
-				ahd_unlock(ahd, &s);
+				ahd_unlock(ahd);
 				return;
 			}
 		}
@@ -9708,7 +9702,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 		}
 
 		if (ccb->ccb_h.status != CAM_REQ_CMP) {
-			ahd_unlock(ahd, &s);
+			ahd_unlock(ahd);
 			return;
 		}
 
@@ -9775,7 +9769,7 @@ ahd_handle_en_lun(struct ahd_softc *ahd, struct cam_sim *sim, union ccb *ccb)
 			}
 		}
 		ahd_unpause(ahd);
-		ahd_unlock(ahd, &s);
+		ahd_unlock(ahd);
 	}
 #endif
 }

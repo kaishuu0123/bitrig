@@ -253,5 +253,4 @@ struct usb_attach_arg {
 #else
 #define	SPLUSBCHECK	do { /* nothing */ } while (0)
 #endif
-#define splhardusb splbio
 #define IPL_USB IPL_BIO

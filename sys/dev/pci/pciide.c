@@ -4327,7 +4327,6 @@ sii3112_drv_probe(struct channel_softc *chp)
 	struct pciide_softc *sc = (struct pciide_softc *)cp->wdc_channel.wdc;
 	uint32_t scontrol, sstatus;
 	uint8_t scnt, sn, cl, ch;
-	int s;
 
 	/*
 	 * The 3112 is a 2-port part, and only has one drive per channel
@@ -4414,12 +4413,12 @@ sii3112_drv_probe(struct channel_softc *chp)
 		 * scnt and sn are supposed to be 0x1 for ATAPI, but in some
 		 * cases we get wrong values here, so ignore it.
 		 */
-		s = splbio();
+		crit_enter();
 		if (cl == 0x14 && ch == 0xeb)
 			chp->ch_drive[0].drive_flags |= DRIVE_ATAPI;
 		else
 			chp->ch_drive[0].drive_flags |= DRIVE_ATA;
-		splx(s);
+		crit_leave();
 
 		printf("%s: port %d: device present",
 		    sc->sc_wdcdev.sc_dev.dv_xname, chp->channel);
@@ -6917,7 +6916,7 @@ pdc203xx_setup_channel(struct channel_softc *chp)
 {
 	struct ata_drive_datas *drvp;
 	struct pciide_channel *cp = (struct pciide_channel *)chp;
-	int drive, s;
+	int drive;
 
 	pciide_channel_dma_setup(cp);
 
@@ -6926,9 +6925,9 @@ pdc203xx_setup_channel(struct channel_softc *chp)
 		if ((drvp->drive_flags & DRIVE) == 0)
 			continue;
 		if (drvp->drive_flags & DRIVE_UDMA) {
-			s = splbio();
+			crit_enter();
 			drvp->drive_flags &= ~DRIVE_DMA;
-			splx(s);
+			crit_leave();
 		}
 	}
 	pciide_print_modes(cp);
@@ -7123,7 +7122,6 @@ pdc205xx_drv_probe(struct channel_softc *chp)
 	bus_space_handle_t *iohs;
 	u_int32_t scontrol, sstatus;
 	u_int16_t scnt, sn, cl, ch;
-	int s;
 
 	SCONTROL_WRITE(ps, chp->channel, 0);
 	delay(50*1000);
@@ -7172,12 +7170,12 @@ pdc205xx_drv_probe(struct channel_softc *chp)
 		 * scnt and sn are supposed to be 0x1 for ATAPI, but in some
 		 * cases we get wrong values here, so ignore it.
 		 */
-		s = splbio();
+		crit_enter();
 		if (cl == 0x14 && ch == 0xeb)
 			chp->ch_drive[0].drive_flags |= DRIVE_ATAPI;
 		else
 			chp->ch_drive[0].drive_flags |= DRIVE_ATA;
-		splx(s);
+		crit_leave();
 #if 0
 		printf("%s: port %d: device present",
 		    sc->sc_wdcdev.sc_dev.dv_xname, chp->channel);
@@ -7789,7 +7787,6 @@ svwsata_drv_probe(struct channel_softc *chp)
 	int channel = chp->channel;
 	uint32_t scontrol, sstatus;
 	uint8_t scnt, sn, cl, ch;
-	int s;
 
 	/*
 	 * Request communication initialization sequence, any speed.
@@ -7873,12 +7870,12 @@ svwsata_drv_probe(struct channel_softc *chp)
 		 * scnt and sn are supposed to be 0x1 for ATAPI, but in some
 		 * cases we get wrong values here, so ignore it.
 		 */
-		s = splbio();
+		crit_enter();
 		if (cl == 0x14 && ch == 0xeb)
 			chp->ch_drive[0].drive_flags |= DRIVE_ATAPI;
 		else
 			chp->ch_drive[0].drive_flags |= DRIVE_ATA;
-		splx(s);
+		crit_leave();
 
 		printf("%s: port %d: device present",
 		    sc->sc_wdcdev.sc_dev.dv_xname, chp->channel);

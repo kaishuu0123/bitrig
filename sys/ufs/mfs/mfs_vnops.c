@@ -152,7 +152,6 @@ mfs_doio(struct mfsnode *mfsp, struct buf *bp)
 {
 	caddr_t base;
 	long offset = bp->b_blkno << DEV_BSHIFT;
-	int s;
 
 	if (bp->b_bcount > mfsp->mfs_size - offset)
 		bp->b_bcount = mfsp->mfs_size - offset;
@@ -166,9 +165,9 @@ mfs_doio(struct mfsnode *mfsp, struct buf *bp)
 		bp->b_flags |= B_ERROR;
 	else
 		bp->b_resid = 0;
-	s = splbio();
+	crit_enter();
 	biodone(bp);
-	splx(s);
+	crit_leave();
 }
 
 /*

@@ -696,7 +696,7 @@ ffs_fsync(void *v)
 	struct vop_fsync_args *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct buf *bp, *nbp;
-	int s, error, passes, skipmeta;
+	int error, passes, skipmeta;
 
 #if WAPBL
 	if (vp->v_mount && vp->v_mount->mnt_wapbl) {
@@ -725,7 +725,7 @@ ffs_fsync(void *v)
 	skipmeta = 0;
 	if (ap->a_waitfor == MNT_WAIT)
 		skipmeta = 1;
-	s = splbio();
+	crit_enter();
 loop:
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd); bp;
 	     bp = LIST_NEXT(bp, b_vnbufs))
@@ -757,7 +757,7 @@ loop:
 		bremfree(bp);
 		buf_acquire(bp);
 		bp->b_flags |= B_SCANNED;
-		splx(s);
+		crit_leave();
 		/*
 		 * On our final pass through, do all I/O synchronously
 		 * so that we can find out if our flush is failing
@@ -767,7 +767,7 @@ loop:
 			(void) bawrite(bp);
 		else if ((error = bwrite(bp)) != 0)
 			return (error);
-		s = splbio();
+		crit_enter();
 		/*
 		 * Since we may have slept during the I/O, we need
 		 * to start from a known point.
@@ -785,10 +785,10 @@ loop:
 		 * Ensure that any filesystem metadata associated
 		 * with the vnode has been written.
 		 */
-		splx(s);
+		crti_leave();
 		if ((error = softdep_sync_metadata(ap)) != 0)
 			return (error);
-		s = splbio();
+		crit_enter();
 		if (!LIST_EMPTY(&vp->v_dirtyblkhd)) {
 			/*
 			 * Block devices associated with filesystems may
@@ -808,7 +808,7 @@ loop:
 #endif
 		}
 	}
-	splx(s);
+	crit_leave();
 
 	return (UFS_UPDATE(VTOI(vp), ap->a_waitfor == MNT_WAIT));
 }

@@ -315,12 +315,12 @@ void
 bufadjust(int newbufpages)
 {
 	struct buf *bp;
-	int s, growing = 0;
+	int growing = 0;
 
 	if (newbufpages < buflowpages)
 		newbufpages = buflowpages;
 
-	s = splbio();
+	crit_enter();
 	if (newbufpages >= bufpages)
 		growing = 1;
 	bufpages = newbufpages;
@@ -356,7 +356,7 @@ bufadjust(int newbufpages)
 	    bcstats.kvaslots_avail <= 2 * RESERVE_SLOTS))
 		wakeup(&bd_req);
 
-	splx(s);
+	crit_leave();
 }
 
 /*
@@ -608,7 +608,7 @@ out:
 int
 bwrite(struct buf *bp)
 {
-	int rv, async, wasdelayed, s;
+	int rv, async, wasdelayed;
 	struct vnode *vp;
 	struct mount *mp;
 
@@ -655,7 +655,7 @@ bwrite(struct buf *bp)
 	wasdelayed = ISSET(bp->b_flags, B_DELWRI);
 	CLR(bp->b_flags, (B_READ | B_DONE | B_ERROR | B_DELWRI));
 
-	s = splbio();
+	crit_enter();
 
 	/*
 	 * If not synchronous, pay for the I/O operation and make
@@ -671,7 +671,7 @@ bwrite(struct buf *bp)
 
 	/* Initiate disk write.  Make sure the appropriate party is charged. */
 	bp->b_vp->v_numoutput++;
-	splx(s);
+	crit_leave();
 	SET(bp->b_flags, B_WRITEINPROG);
 	VOP_STRATEGY(bp);
 
@@ -752,9 +752,9 @@ bdwrite(struct buf *bp)
 	 */
 	if (!ISSET(bp->b_flags, B_DELWRI)) {
 		SET(bp->b_flags, B_DELWRI);
-		s = splbio();
+		crit_enter();
 		reassignbuf(bp);
-		splx(s);
+		crit_leave();
 		curproc->p_ru.ru_oublock++;		/* XXX */
 	}
 
@@ -820,9 +820,8 @@ void
 brelse(struct buf *bp)
 {
 	struct bqueues *bufq;
-	int s;
 
-	s = splbio();
+	crit_enter();
 
 	if (bp->b_data != NULL)
 		KASSERT(bp->b_bufsize > 0);
@@ -928,7 +927,7 @@ brelse(struct buf *bp)
 		wakeup(&needbuffer);
 	}
 
-	splx(s);
+	crit_leave();
 }
 
 /*
@@ -940,9 +939,8 @@ incore(struct vnode *vp, daddr_t blkno)
 {
 	struct buf *bp;
 	struct buf b;
-	int s;
 
-	s = splbio();
+	crit_enter();
 
 	/* Search buf lookup tree */
 	b.b_lblkno = blkno;
@@ -950,7 +948,7 @@ incore(struct vnode *vp, daddr_t blkno)
 	if (bp != NULL && ISSET(bp->b_flags, B_INVAL))
 		bp = NULL;
 
-	splx(s);
+	crit_leave();
 	return (bp);
 }
 
@@ -967,7 +965,7 @@ getblk(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo)
 {
 	struct buf *bp;
 	struct buf b;
-	int s, error;
+	int error;
 
 	/*
 	 * XXX
@@ -980,7 +978,7 @@ getblk(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo)
 	 * the block until the write is finished.
 	 */
 start:
-	s = splbio();
+	crit_enter();
 	b.b_lblkno = blkno;
 	bp = RB_FIND(buf_rb_bufs, &vp->v_bufs_tree, &b);
 	if (bp != NULL) {
@@ -988,7 +986,7 @@ start:
 			SET(bp->b_flags, B_WANTED);
 			error = tsleep(bp, slpflag | (PRIBIO + 1), "getblk",
 			    slptimeo);
-			splx(s);
+			crit_leave();
 			if (error)
 				return (NULL);
 			goto start;
@@ -999,11 +997,11 @@ start:
 			SET(bp->b_flags, B_CACHE);
 			bremfree(bp);
 			buf_acquire(bp);
-			splx(s);
+			crit_leave();
 			return (bp);
 		}
 	}
-	splx(s);
+	crit_leave();
 
 	if ((bp = buf_get(vp, blkno, size)) == NULL)
 		goto start;
@@ -1034,9 +1032,8 @@ buf_get(struct vnode *vp, daddr_t blkno, size_t size)
 	struct buf *bp;
 	int poolwait = size == 0 ? PR_NOWAIT : PR_WAITOK;
 	int npages;
-	int s;
 
-	s = splbio();
+	crit_enter();
 	if (size) {
 		/*
 		 * Wake up the cleaner if we have lots of dirty pages,
@@ -1089,14 +1086,14 @@ buf_get(struct vnode *vp, daddr_t blkno, size_t size)
 			wakeup(&bd_req);
 			needbuffer++;
 			tsleep(&needbuffer, PRIBIO, "needbuffer", 0);
-			splx(s);
+			crit_leave();
 			return (NULL);
 		}
 		if (bcstats.numbufpages + npages > bufpages) {
 			/* cleaner or syncer */
 			nobuffers = 1;
 			tsleep(&nobuffers, PRIBIO, "nobuffers", 0);
-			splx(s);
+			crit_leave();
 			return (NULL);
 		}
 	}
@@ -1104,7 +1101,7 @@ buf_get(struct vnode *vp, daddr_t blkno, size_t size)
 	bp = pool_get(&bufpool, poolwait|PR_ZERO);
 
 	if (bp == NULL) {
-		splx(s);
+		crit_leave();
 		return (NULL);
 	}
 
@@ -1127,7 +1124,7 @@ buf_get(struct vnode *vp, daddr_t blkno, size_t size)
 		 */
 		if (incore(vp, blkno)) {
 			pool_put(&bufpool, bp);
-			splx(s);
+			crit_leave();
 			return (NULL);
 		}
 
@@ -1149,7 +1146,7 @@ buf_get(struct vnode *vp, daddr_t blkno, size_t size)
 		buf_map(bp);
 	}
 
-	splx(s);
+	crit_leave();
 
 	return (bp);
 }
@@ -1162,14 +1159,14 @@ buf_daemon(struct proc *p)
 {
 	struct timeval starttime, timediff;
 	struct buf *bp = NULL;
-	int s, pushed = 0;
+	int pushed = 0;
 #ifdef WAPBL_DEBUG
 	int did_wapbl = 0; /* XXX pedro: remove me */
 #endif
 
 	cleanerproc = curproc;
 
-	s = splbio();
+	crit_enter();
 	for (;;) {
 #ifdef WAPBL_DEBUG
 		did_wapbl = 0;
@@ -1201,11 +1198,11 @@ buf_daemon(struct proc *p)
 
 			bremfree(bp);
 			buf_acquire(bp);
-			splx(s);
+			crit_leave();
 
 			if (ISSET(bp->b_flags, B_INVAL)) {
 				brelse(bp);
-				s = splbio();
+				crit_enter();
 				continue;
 			}
 #ifdef DIAGNOSTIC
@@ -1239,7 +1236,7 @@ buf_daemon(struct proc *p)
 			    !ISSET(bp->b_flags, B_DEFERRED) &&
 			    buf_countdeps(bp, 0, 0)) {
 				SET(bp->b_flags, B_DEFERRED);
-				s = splbio();
+				crit_enter();
 				bcstats.numdirtypages += atop(bp->b_bufsize);
 				bcstats.delwribufs++;
 				binstailfree(bp, &bufqueues[BQ_DIRTY]);
@@ -1253,7 +1250,7 @@ buf_daemon(struct proc *p)
 			/* Never allow processing to run for more than 1 sec */
 			getmicrouptime(&tv);
 			timersub(&tv, &starttime, &timediff);
-			s = splbio();
+			crit_enter();
 			if (timediff.tv_sec)
 				break;
 
@@ -1268,14 +1265,12 @@ buf_daemon(struct proc *p)
 int
 biowait(struct buf *bp)
 {
-	int s;
-
 	KASSERT(!(bp->b_flags & B_ASYNC));
 
-	s = splbio();
+	crit_enter();
 	while (!ISSET(bp->b_flags, B_DONE))
 		tsleep(bp, PRIBIO + 1, "biowait", 0);
-	splx(s);
+	crit_leave();
 
 	/* check for interruption of I/O (e.g. via NFS), then errors. */
 	if (ISSET(bp->b_flags, B_EINTR)) {

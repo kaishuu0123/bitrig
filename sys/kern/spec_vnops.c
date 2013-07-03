@@ -418,7 +418,6 @@ spec_fsync(void *v)
 	struct vnode *vp = ap->a_vp;
 	struct buf *bp;
 	struct buf *nbp;
-	int s;
 
 	if (vp->v_type == VCHR)
 		return (0);
@@ -437,7 +436,7 @@ spec_fsync(void *v)
 	 * Flush all dirty buffers associated with a block device.
 	 */
 loop:
-	s = splbio();
+	crit_enter();
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd);
 	    bp != LIST_END(&vp->v_dirtyblkhd); bp = nbp) {
 		nbp = LIST_NEXT(bp, b_vnbufs);
@@ -447,7 +446,7 @@ loop:
 			panic("spec_fsync: not dirty");
 		bremfree(bp);
 		buf_acquire(bp);
-		splx(s);
+		crit_leave();
 		bawrite(bp);
 		goto loop;
 	}
@@ -456,13 +455,13 @@ loop:
 
 #ifdef DIAGNOSTIC
 		if (!LIST_EMPTY(&vp->v_dirtyblkhd)) {
-			splx(s);
+			crit_enter();
 			vprint("spec_fsync: dirty", vp);
 			goto loop;
 		}
 #endif
 	}
-	splx(s);
+	crit_leave();
 	return (0);
 }
 

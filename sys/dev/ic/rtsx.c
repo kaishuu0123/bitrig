@@ -374,21 +374,20 @@ int
 rtsx_host_reset(sdmmc_chipset_handle_t sch)
 {
 	struct rtsx_softc *sc = sch;
-	int s;
 
 	DPRINTF(1,("%s: host reset\n", DEVNAME(sc)));
 
-	s = splsdmmc();
+	crit_enter();
 
 	if (ISSET(sc->flags, RTSX_F_CARD_PRESENT))
 		rtsx_soft_reset(sc);
 
 	if (rtsx_init(sc, 0)) {
-		splx(s);
+		crit_leave();
 		return 1;
 	}
 
-	splx(s);
+	crit_leave();
 	return 0;
 }
 
@@ -569,11 +568,11 @@ int
 rtsx_bus_power(sdmmc_chipset_handle_t sch, u_int32_t ocr)
 {
 	struct rtsx_softc *sc = sch;
-	int s, error = 0;
+	int error = 0;
 
 	DPRINTF(1,("%s: voltage change ocr=0x%x\n", DEVNAME(sc), ocr));
 
-	s = splsdmmc();
+	crit_enter();
 
 	/*
 	 * Disable bus power before voltage change.
@@ -586,7 +585,7 @@ rtsx_bus_power(sdmmc_chipset_handle_t sch, u_int32_t ocr)
 
 	/* If power is disabled, reset the host and return now. */
 	if (ocr == 0) {
-		splx(s);
+		crit_leave();
 		(void)rtsx_host_reset(sc);
 		return 0;
 	}
@@ -605,7 +604,7 @@ rtsx_bus_power(sdmmc_chipset_handle_t sch, u_int32_t ocr)
 
 	error = rtsx_bus_power_on(sc);
 ret:
-	splx(s);
+	crit_leave();
 	return error;
 }
 
@@ -617,13 +616,12 @@ int
 rtsx_bus_clock(sdmmc_chipset_handle_t sch, int freq)
 {
 	struct rtsx_softc *sc = sch;
-	int s;
 	u_int8_t n;
 	int div;
 	int mcu;
 	int error = 0;
 
-	s = splsdmmc();
+	crit_enter();
 
 	if (freq == SDMMC_SDCLK_OFF) {
 		error = rtsx_stop_sd_clock(sc);
@@ -656,7 +654,7 @@ rtsx_bus_clock(sdmmc_chipset_handle_t sch, int freq)
 	 */
 	error = rtsx_switch_sd_clock(sc, n, div, mcu);
 ret:
-	splx(s);
+	crit_leave();
 	return error;
 }
 
@@ -837,10 +835,10 @@ rtsx_hostcmd(u_int32_t *cmdbuf, int *n, u_int8_t cmd, u_int16_t reg,
 void
 rtsx_save_regs(struct rtsx_softc *sc)
 {
-	int s, i;
+	int i;
 	u_int16_t reg;
 
-	s = splsdmmc();
+	crit_enter();
 
 	i = 0;
 	for (reg = 0xFDA0; reg < 0xFDAE; reg++)
@@ -858,16 +856,16 @@ rtsx_save_regs(struct rtsx_softc *sc)
 	sc->regs4[5] = READ4(sc, RTSX_BIER);
 	/* Not saving RTSX_BIPR. */
 
-	splx(s);
+	crit_leave();
 }
 
 void
 rtsx_restore_regs(struct rtsx_softc *sc)
 {
-	int s, i;
+	int i;
 	u_int16_t reg;
 
-	s = splsdmmc();
+	crit_enter();
 
 	WRITE4(sc, RTSX_HCBAR, sc->regs4[0]);
 	WRITE4(sc, RTSX_HCBCTLR, sc->regs4[1]);
@@ -885,7 +883,7 @@ rtsx_restore_regs(struct rtsx_softc *sc)
 	for (reg = 0xFE20; reg < 0xFE34; reg++)
 		(void)rtsx_write(sc, reg, 0xff, sc->regs[i++]);
 
-	splx(s);
+	crit_leave();
 }
 
 u_int8_t
@@ -918,16 +916,14 @@ rtsx_response_type(u_int16_t sdmmc_rsp)
 int
 rtsx_hostcmd_send(struct rtsx_softc *sc, int ncmd)
 {
-	int s;
-
-	s = splsdmmc();
+	crit_enter();
 
 	/* Tell the chip where the command buffer is and run the commands. */
 	WRITE4(sc, RTSX_HCBAR, sc->dmap_cmd->dm_segs[0].ds_addr);
 	WRITE4(sc, RTSX_HCBCTLR,
 	    ((ncmd * 4) & 0x00ffffff) | RTSX_START_CMD | RTSX_HW_AUTO_RSP);
 
-	splx(s);
+	crit_leave();
 
 	return 0;
 }
@@ -937,7 +933,7 @@ rtsx_xfer(struct rtsx_softc *sc, struct sdmmc_command *cmd, u_int32_t *cmdbuf)
 {
     	caddr_t datakvap;
 	bus_dma_segment_t segs;
-	int ncmd, s, dma_dir, error, rsegs, tmode;
+	int ncmd, dma_dir, error, rsegs, tmode;
 	int read = ISSET(cmd->c_flags, SCF_CMD_READ);
 	u_int8_t cfg2;
 
@@ -1050,14 +1046,14 @@ rtsx_xfer(struct rtsx_softc *sc, struct sdmmc_command *cmd, u_int32_t *cmdbuf)
 	bus_dmamap_sync(sc->dmat, sc->dmap_data, 0, cmd->c_datalen,
 	    BUS_DMASYNC_PREWRITE);
 
-	s = splsdmmc();
+	crit_enter();
 
 	/* Tell the chip where the data buffer is and run the transfer. */
 	WRITE4(sc, RTSX_HDBAR, sc->dmap_data->dm_segs[0].ds_addr);
 	WRITE4(sc, RTSX_HDBCTLR, RTSX_TRIG_DMA | (read ? RTSX_DMA_READ : 0) |
 	    (sc->dmap_data->dm_segs[0].ds_len & 0x00ffffff));
 
-	splx(s);
+	crit_leave();
 
 	/* Wait for completion. */
 	error = rtsx_wait_intr(sc, RTSX_TRANS_OK_INT, 10*hz);
@@ -1257,11 +1253,10 @@ rtsx_wait_intr(struct rtsx_softc *sc, int mask, int timo)
 {
 	int status;
 	int error = 0;
-	int s;
 
 	mask |= RTSX_TRANS_FAIL_INT;
 
-	s = splsdmmc();
+	crit_enter()
 	status = sc->intr_status & mask;
 	while (status == 0) {
 		if (tsleep(&sc->intr_status, PRIBIO, "rtsxintr", timo)
@@ -1278,7 +1273,7 @@ rtsx_wait_intr(struct rtsx_softc *sc, int mask, int timo)
 	if (!ISSET(sc->flags, RTSX_F_CARD_PRESENT))
 		error = ENODEV;
 
-	splx(s);
+	crit_leave();
 
 	if (error == 0 && (status & RTSX_TRANS_FAIL_INT))
 		error = EIO;
