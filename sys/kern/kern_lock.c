@@ -140,7 +140,7 @@ _kernel_unlock(void)
 #endif /* MULTIPROCESSOR */
 
 void
-mtx_init(struct mutex *mtx, int ipl)
+__mtx_init(struct mutex *mtx, int ipl)
 {
 	mtx->mtx_wantipl = ipl;
 	mtx->mtx_oldipl	 = IPL_NONE;

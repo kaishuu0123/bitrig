@@ -28,6 +28,7 @@
 #include <sys/buf.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <sys/proc.h>
 #include <uvm/uvm.h>
 #include <uvm/uvm_swap.h>
 #include <machine/hibernate.h>
@@ -1142,7 +1143,7 @@ hibernate_resume(void)
 	 */
 	if (hibernate_compare_signature(&hib, &disk_hib)) {
 		DPRINTF("mismatched hibernate signature block\n");
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1180,7 +1181,7 @@ hibernate_resume(void)
 	hibernate_unpack_image(&disk_hib);
 
 fail:
-	splx(s);
+	crit_leave();
 	printf("\nUnable to resume hibernated image\n");
 }
 

@@ -32,6 +32,7 @@
 #include <sys/device.h>
 #include <sys/task.h>
 #include <sys/pool.h>
+#include <sys/proc.h>
 #include <uvm/uvm.h>
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcivar.h>
