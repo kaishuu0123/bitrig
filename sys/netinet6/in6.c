@@ -743,7 +743,7 @@ in6_update_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	struct rtentry *rt;
 	char addr[INET6_ADDRSTRLEN];
 
-	crit_assert();
+	CRIT_ASSERT();
 
 	/* Validate parameters */
 	if (ifp == NULL || ifra == NULL) /* this maybe redundant */
