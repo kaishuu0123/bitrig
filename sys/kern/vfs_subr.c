@@ -1756,7 +1756,7 @@ vwaitforio(struct vnode *vp, int slpflag, char *wmesg, int timeo)
 {
 	int error = 0;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	while (vp->v_numoutput) {
 		vp->v_bioflag |= VBIOWAIT;
@@ -1777,7 +1777,7 @@ vwaitforio(struct vnode *vp, int slpflag, char *wmesg, int timeo)
 void
 vwakeup(struct vnode *vp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	if (vp != NULL) {
 		if (vp->v_numoutput-- == 0)
@@ -1982,7 +1982,7 @@ loop:
 void
 bgetvp(struct vnode *vp, struct buf *bp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 
 	if (bp->b_vp)
@@ -2009,7 +2009,7 @@ brelvp(struct buf *bp)
 {
 	struct vnode *vp;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	if ((vp = bp->b_vp) == (struct vnode *) 0)
 		panic("brelvp: NULL");
@@ -2042,7 +2042,7 @@ buf_replacevnode(struct buf *bp, struct vnode *newvp)
 {
 	struct vnode *oldvp = bp->b_vp;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	if (oldvp)
 		brelvp(bp);
@@ -2070,7 +2070,7 @@ reassignbuf(struct buf *bp)
 	int delay;
 	struct vnode *vp = bp->b_vp;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	/*
 	 * Delete from old vnode list, if on one.

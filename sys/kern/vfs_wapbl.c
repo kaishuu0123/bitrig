@@ -533,7 +533,7 @@ wapbl_start(struct wapbl ** wlp, struct mount *mp, struct vnode *vp,
 int
 wapbl_bbusy(struct buf *bp, struct mutex *mtx)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	KASSERT(bp->b_flags & B_LOCKED);
 

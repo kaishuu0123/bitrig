@@ -152,7 +152,7 @@ bremfree(struct buf *bp)
 {
 	struct bqueues *dp = NULL;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	/*
 	 * We only calculate the head of the freelist when removing
@@ -184,7 +184,7 @@ bremfree(struct buf *bp)
 void
 buf_put(struct buf *bp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 #ifdef DIAGNOSTIC
 	if (bp->b_pobj != NULL)
@@ -781,7 +781,7 @@ bawrite(struct buf *bp)
 void
 buf_dirty(struct buf *bp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 #ifdef DIAGNOSTIC
 	if (!ISSET(bp->b_flags, B_BUSY))
@@ -800,7 +800,7 @@ buf_dirty(struct buf *bp)
 void
 buf_undirty(struct buf *bp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 #ifdef DIAGNOSTIC
 	if (!ISSET(bp->b_flags, B_BUSY))
@@ -1305,7 +1305,7 @@ biowait(struct buf *bp)
 void
 biodone(struct buf *bp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	if (ISSET(bp->b_flags, B_DONE))
 		panic("biodone already");

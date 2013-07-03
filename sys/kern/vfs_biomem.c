@@ -73,7 +73,7 @@ void
 buf_acquire(struct buf *bp)
 {
 	KASSERT((bp->b_flags & B_BUSY) == 0);
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 	/*
 	 * Busy before waiting for kvm.
 	 */
@@ -87,7 +87,7 @@ buf_acquire(struct buf *bp)
 void
 buf_acquire_nomap(struct buf *bp)
 {
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 	SET(bp->b_flags, B_BUSY);
 	if (bp->b_data != NULL && !(bp->b_flags & B_LOCKED)) {
 		TAILQ_REMOVE(&buf_valist, bp, b_valist);
@@ -101,7 +101,7 @@ buf_map(struct buf *bp)
 {
 	vaddr_t va;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	if (bp->b_data == NULL) {
 		unsigned long i;
@@ -160,7 +160,7 @@ buf_release(struct buf *bp)
 {
 
 	KASSERT(bp->b_flags & B_BUSY);
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	if (bp->b_data && !(bp->b_flags & B_LOCKED)) {
 		bcstats.busymapped--;
@@ -194,7 +194,7 @@ buf_dealloc_mem(struct buf *bp)
 {
 	caddr_t data;
 
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	data = bp->b_data;
 	bp->b_data = NULL;
@@ -258,7 +258,7 @@ buf_unmap(struct buf *bp)
 
 	KASSERT((bp->b_flags & B_BUSY) == 0);
 	KASSERT(bp->b_data != NULL);
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	TAILQ_REMOVE(&buf_valist, bp, b_valist);
 	bcstats.kvaslots_avail--;
@@ -282,7 +282,7 @@ buf_alloc_pages(struct buf *bp, vsize_t size)
 	KASSERT(size == round_page(size));
 	KASSERT(bp->b_pobj == NULL);
 	KASSERT(bp->b_data == NULL);
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	offs = buf_page_offset;
 	buf_page_offset += size;
@@ -305,7 +305,7 @@ buf_free_pages(struct buf *bp)
 
 	KASSERT(bp->b_data == NULL);
 	KASSERT(uobj != NULL);
-	splassert(IPL_BIO);
+	CRIT_ASSERT();
 
 	off = bp->b_poffs;
 	bp->b_pobj = NULL;
