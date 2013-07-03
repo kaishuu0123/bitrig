@@ -180,8 +180,6 @@ mtx_enter_try(struct mutex *mtx)
 	if (mtx->mtx_wantipl > IPL_CRIT)
 		mtx->mtx_oldipl = s;
 
-	crit_leave();
-
 	return (1);
 }
 
@@ -210,4 +208,6 @@ mtx_leave(struct mutex *mtx)
 #endif
 	if (mtx->mtx_wantipl != IPL_NONE)
 		splx(s);
+
+	crit_leave();
 }
