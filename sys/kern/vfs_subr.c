@@ -1857,7 +1857,7 @@ loop:
 			 */
 			if ((bp->b_flags & B_DELWRI) && (flags & V_SAVE)) {
 				buf_acquire(bp);
-				splx(s);
+				crit_leave();
 				(void) VOP_BWRITE(bp);
 				goto loop;
 			}
