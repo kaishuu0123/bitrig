@@ -70,6 +70,7 @@
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/timeout.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -418,9 +419,9 @@ sis_mii_send(struct sis_softc *sc, u_int32_t bits, int cnt)
 int
 sis_mii_readreg(struct sis_softc *sc, struct sis_mii_frame *frame)
 {
-	int			i, ack, s;
+	int			i, ack;
  
-	s = splnet();
+	crit_enter();
  
 	/*
 	 * Set up frame for RX.
@@ -494,7 +495,7 @@ fail:
 	SIO_SET(SIS_MII_CLK);
 	DELAY(1);
 
-	splx(s);
+	crit_leave();
 
 	if (ack)
 		return (1);
@@ -507,9 +508,7 @@ fail:
 int
 sis_mii_writereg(struct sis_softc *sc, struct sis_mii_frame *frame)
 {
-	int			s;
- 
-	s = splnet();
+	crit_enter();
  	/*
  	 * Set up frame for TX.
  	 */
@@ -543,7 +542,7 @@ sis_mii_writereg(struct sis_softc *sc, struct sis_mii_frame *frame)
  	 */
  	SIO_CLR(SIS_MII_DIR);
  
- 	splx(s);
+ 	crit_leave();
  
  	return (0);
 }
@@ -1501,9 +1500,8 @@ sis_tick(void *xsc)
 {
 	struct sis_softc	*sc = (struct sis_softc *)xsc;
 	struct mii_data		*mii;
-	int			s;
 
-	s = splnet();
+	crit_enter();
 
 	mii = &sc->sc_mii;
 	mii_tick(mii);
@@ -1513,7 +1511,7 @@ sis_tick(void *xsc)
 	
 	timeout_add_sec(&sc->sis_timeout, 1);
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -1688,9 +1686,8 @@ sis_init(void *xsc)
 	struct sis_softc	*sc = (struct sis_softc *)xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii;
-	int			s;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
@@ -1733,7 +1730,7 @@ sis_init(void *xsc)
 		printf("%s: initialization failed: no memory for rx buffers\n",
 		    sc->sc_dev.dv_xname);
 		sis_stop(sc);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1808,7 +1805,7 @@ sis_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 
 	timeout_add_sec(&sc->sis_timeout, 1);
 }
@@ -1859,9 +1856,9 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct ifaddr		*ifa = (struct ifaddr *) data;
 	struct ifreq		*ifr = (struct ifreq *) data;
 	struct mii_data		*mii;
-	int			s, error = 0;
+	int			error = 0;
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -1902,7 +1899,7 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 	return(error);
 }
 
@@ -1910,7 +1907,6 @@ void
 sis_watchdog(struct ifnet *ifp)
 {
 	struct sis_softc	*sc;
-	int			s;
 
 	sc = ifp->if_softc;
 
@@ -1920,7 +1916,7 @@ sis_watchdog(struct ifnet *ifp)
 	ifp->if_oerrors++;
 	printf("%s: watchdog timeout\n", sc->sc_dev.dv_xname);
 
-	s = splnet();
+	crit_enter();
 	sis_stop(sc);
 	sis_reset(sc);
 	sis_init(sc);
@@ -1928,7 +1924,7 @@ sis_watchdog(struct ifnet *ifp)
 	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 
-	splx(s);
+	crit_leave();
 }
 
 /*

@@ -31,6 +31,7 @@
 #include <sys/malloc.h>
 #include <sys/timeout.h>
 #include <sys/device.h>
+#include <sys/proc.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -329,9 +330,8 @@ void
 ral_cardbus_wakeup(struct ral_cardbus_softc *csc)
 {
 	struct rt2560_softc *sc = &csc->sc_sc;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	(*csc->sc_opns->resume)(sc);
-	splx(s);
+	crit_leave();
 }

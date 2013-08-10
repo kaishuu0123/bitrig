@@ -49,6 +49,7 @@
 #include <sys/socket.h>
 #include <sys/device.h>
 #include <sys/tree.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -506,9 +507,7 @@ wi_pcmcia_activate(struct device *dev, int act)
 void
 wi_pcmcia_wakeup(struct wi_softc *sc)
 {
-	int s;
-
-	s = splnet();
+	crit_enter();
 	while (sc->wi_flags & WI_FLAGS_BUSY)
 		tsleep(&sc->wi_flags, 0, "wipwr", 0);
 	sc->wi_flags |= WI_FLAGS_BUSY;
@@ -518,5 +517,5 @@ wi_pcmcia_wakeup(struct wi_softc *sc)
 
 	sc->wi_flags &= ~WI_FLAGS_BUSY;
 	wakeup(&sc->wi_flags);
-	splx(s);
+	crit_leave();
 }

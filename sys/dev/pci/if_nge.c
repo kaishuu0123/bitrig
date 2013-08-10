@@ -378,9 +378,9 @@ nge_mii_send(struct nge_softc *sc, u_int32_t bits, int cnt)
 int
 nge_mii_readreg(struct nge_softc *sc, struct nge_mii_frame *frame)
 {
-	int			i, ack, s;
+	int			i, ack;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Set up frame for RX.
@@ -455,7 +455,7 @@ fail:
 	SIO_SET(NGE_MEAR_MII_CLK);
 	DELAY(1);
 
-	splx(s);
+	crit_leave();
 
 	if (ack)
 		return(1);
@@ -470,7 +470,7 @@ nge_mii_writereg(struct nge_softc *sc, struct nge_mii_frame *frame)
 {
 	int			s;
 
-	s = splnet();
+	crit_enter();
 	/*
 	 * Set up frame for TX.
 	 */
@@ -504,7 +504,7 @@ nge_mii_writereg(struct nge_softc *sc, struct nge_mii_frame *frame)
 	 */
 	SIO_CLR(NGE_MEAR_MII_DIR);
 
-	splx(s);
+	crit_leave();
 
 	return(0);
 }
@@ -1366,16 +1366,15 @@ nge_tick(void *xsc)
 	struct nge_softc	*sc = xsc;
 	struct mii_data		*mii = &sc->nge_mii;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
-	int			s;
 
-	s = splnet();
+	crit_enter();
 
 	DPRINTFN(10, ("%s: nge_tick: link=%d\n", sc->sc_dv.dv_xname,
 		      sc->nge_link));
 
 	timeout_add_sec(&sc->nge_timeout, 1);
 	if (sc->nge_link) {
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1391,7 +1390,7 @@ nge_tick(void *xsc)
 			if (!(bmsr & NGE_TBIBMSR_ANEG_DONE)) {
 				CSR_WRITE_4(sc, NGE_TBI_BMCR, 0);
 
-				splx(s);
+				crit_leave();
 				return;
 			}
 				
@@ -1435,7 +1434,7 @@ nge_tick(void *xsc)
 		
 	}
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -1648,12 +1647,12 @@ nge_init(void *xsc)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii;
 	u_int32_t		txcfg, rxcfg;
-	int			s, media;
+	int			media;
 
 	if (ifp->if_flags & IFF_RUNNING)
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
@@ -1678,7 +1677,7 @@ nge_init(void *xsc)
 		printf("%s: initialization failed: no "
 			"memory for rx buffers\n", sc->sc_dv.dv_xname);
 		nge_stop(sc);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1820,7 +1819,7 @@ nge_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 }
 
 /*
@@ -1970,9 +1969,9 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct ifaddr		*ifa = (struct ifaddr *) data;
 	struct ifreq		*ifr = (struct ifreq *) data;
 	struct mii_data		*mii;
-	int			s, error = 0;
+	int			error = 0;
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -2040,7 +2039,7 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 	return(error);
 }
 

@@ -102,6 +102,7 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/timeout.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -519,9 +520,9 @@ dc_mii_send(struct dc_softc *sc, u_int32_t bits, int cnt)
 int
 dc_mii_readreg(struct dc_softc *sc, struct dc_mii_frame *frame)
 {
-	int i, ack, s;
+	int i, ack;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Set up frame for RX.
@@ -576,7 +577,7 @@ fail:
 	dc_mii_writebit(sc, 0);
 	dc_mii_writebit(sc, 0);
 
-	splx(s);
+	crit_leave();
 
 	if (ack)
 		return (1);
@@ -589,9 +590,7 @@ fail:
 int
 dc_mii_writereg(struct dc_softc *sc, struct dc_mii_frame *frame)
 {
-	int s;
-
-	s = splnet();
+	crit_enter();
 	/*
 	 * Set up frame for TX.
 	 */
@@ -616,7 +615,7 @@ dc_mii_writereg(struct dc_softc *sc, struct dc_mii_frame *frame)
 	dc_mii_writebit(sc, 0);
 	dc_mii_writebit(sc, 0);
 
-	splx(s);
+	crit_leave();
 	return (0);
 }
 
@@ -2295,10 +2294,9 @@ dc_tick(void *xsc)
 	struct dc_softc *sc = (struct dc_softc *)xsc;
 	struct mii_data *mii;
 	struct ifnet *ifp;
-	int s;
 	u_int32_t r;
 
-	s = splnet();
+	crit_enter();
 
 	ifp = &sc->sc_arpcom.ac_if;
 	mii = &sc->sc_mii;
@@ -2365,7 +2363,7 @@ dc_tick(void *xsc)
 	else
 		timeout_add_sec(&sc->dc_tick_tmo, 1);
 
-	splx(s);
+	crit_leave();
 }
 
 /* A transmit underrun has occurred.  Back off the transmit threshold,
@@ -2699,9 +2697,8 @@ dc_init(void *xsc)
 	struct dc_softc *sc = xsc;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct mii_data *mii;
-	int s;
 
-	s = splnet();
+	crit_enter();
 
 	mii = &sc->sc_mii;
 
@@ -2793,7 +2790,7 @@ dc_init(void *xsc)
 		printf("%s: initialization failed: no "
 		    "memory for rx buffers\n", sc->sc_dev.dv_xname);
 		dc_stop(sc, 0);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -2855,7 +2852,7 @@ dc_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 
 	timeout_set(&sc->dc_tick_tmo, dc_tick, sc);
 
@@ -2935,9 +2932,9 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct dc_softc		*sc = ifp->if_softc;
 	struct ifreq		*ifr = (struct ifreq *) data;
 	struct ifaddr		*ifa = (struct ifaddr *)data;
-	int			s, error = 0;
+	int			error = 0;
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -2980,7 +2977,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 	return (error);
 }
 

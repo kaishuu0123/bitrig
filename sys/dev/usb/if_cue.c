@@ -442,7 +442,6 @@ cue_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct cue_softc	*sc = (struct cue_softc *)self;
 	struct usb_attach_arg	*uaa = aux;
-	int			s;
 	u_char			eaddr[ETHER_ADDR_LEN];
 	struct usbd_device	*dev = uaa->device;
 	struct usbd_interface	*iface;
@@ -510,7 +509,7 @@ cue_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	cue_getmac(sc, &eaddr);
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * A CATC chip was detected. Inform the world.
@@ -537,7 +536,7 @@ cue_attach(struct device *parent, struct device *self, void *aux)
 
 	timeout_set(&sc->cue_stat_ch, cue_tick, sc);
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -702,7 +701,6 @@ cue_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct mbuf		*m;
 	int			total_len = 0;
 	u_int16_t		len;
-	int			s;
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", sc->cue_dev.dv_xname,
 		     __func__, status));
@@ -749,7 +747,7 @@ cue_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 
 	m->m_pkthdr.rcvif = ifp;
 
-	s = splnet();
+	crit_enter();
 
 	/* XXX ugly */
 	if (cue_newbuf(sc, c, NULL) == ENOBUFS) {
@@ -772,7 +770,7 @@ cue_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		    __func__, m->m_len));
 	ether_input_mbuf(ifp, m);
  done1:
-	splx(s);
+	crit_leave();
 
 done:
 	/* Setup new transfer. */
@@ -795,12 +793,11 @@ cue_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct cue_chain	*c = priv;
 	struct cue_softc	*sc = c->cue_sc;
 	struct ifnet		*ifp = GET_IFP(sc);
-	int			s;
 
 	if (usbd_is_dying(sc->cue_udev))
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", sc->cue_dev.dv_xname,
 		    __func__, status));
@@ -810,7 +807,7 @@ cue_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 
 	if (status != USBD_NORMAL_COMPLETION) {
 		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
-			splx(s);
+			crit_leave();
 			return;
 		}
 		ifp->if_oerrors++;
@@ -818,7 +815,7 @@ cue_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		    usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall_async(sc->cue_ep[CUE_ENDPT_TX]);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -830,7 +827,7 @@ cue_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		cue_start(ifp);
 
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -962,7 +959,7 @@ cue_init(void *xsc)
 {
 	struct cue_softc	*sc = xsc;
 	struct ifnet		*ifp = GET_IFP(sc);
-	int			i, s, ctl;
+	int			i, ctl;
 	u_char			*eaddr;
 
 	if (usbd_is_dying(sc->cue_udev))
@@ -973,7 +970,7 @@ cue_init(void *xsc)
 	if (ifp->if_flags & IFF_RUNNING)
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
@@ -1000,14 +997,14 @@ cue_init(void *xsc)
 	/* Init TX ring. */
 	if (cue_tx_list_init(sc) == ENOBUFS) {
 		printf("%s: tx list init failed\n", sc->cue_dev.dv_xname);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
 	/* Init RX ring. */
 	if (cue_rx_list_init(sc) == ENOBUFS) {
 		printf("%s: rx list init failed\n", sc->cue_dev.dv_xname);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1030,7 +1027,7 @@ cue_init(void *xsc)
 
 	if (sc->cue_ep[CUE_ENDPT_RX] == NULL) {
 		if (cue_open_pipes(sc)) {
-			splx(s);
+			crit_leave();
 			return;
 		}
 	}
@@ -1038,7 +1035,7 @@ cue_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 
 	timeout_add_sec(&sc->cue_stat_ch, 1);
 }
@@ -1084,12 +1081,12 @@ cue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct cue_softc	*sc = ifp->if_softc;
 	struct ifaddr 		*ifa = (struct ifaddr *)data;
-	int			s, error = 0;
+	int			error = 0;
 
 	if (usbd_is_dying(sc->cue_udev))
 		return (EIO);
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -1137,7 +1134,7 @@ cue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 	return (error);
 }
 

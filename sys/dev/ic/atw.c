@@ -46,6 +46,7 @@
 #include <sys/errno.h>
 #include <sys/device.h>
 #include <sys/time.h>
+#include <sys/proc.h>
 
 #include <machine/endian.h>
 
@@ -1229,7 +1230,7 @@ atw_si4126_init(struct atw_softc *sc)
 /*
  * atw_init:		[ ifnet interface function ]
  *
- *	Initialize the interface.  Must be called at splnet().
+ *	Initialize the interface.  Must be called at critical section.
  */
 int
 atw_init(struct ifnet *ifp)
@@ -2483,13 +2484,12 @@ atw_next_scan(void *arg)
 	struct atw_softc *sc = arg;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ifnet *ifp = &ic->ic_if;
-	int s;
 
 	/* don't call atw_start w/o network interrupts blocked */
-	s = splnet();
+	crit_enter();
 	if (ic->ic_state == IEEE80211_S_SCAN)
 		ieee80211_next_scan(ifp);
-	splx(s);
+	crit_leave();
 }
 
 /* Synchronize the hardware state with the software state. */
@@ -2934,9 +2934,9 @@ void
 atw_idle(struct atw_softc *sc, u_int32_t bits)
 {
 	u_int32_t ackmask = 0, opmode, stsr, test0;
-	int i, s;
+	int i;
 
-	s = splnet();
+	crit_enter();
 
 	opmode = sc->sc_opmode & ~bits;
 
@@ -2986,7 +2986,7 @@ atw_idle(struct atw_softc *sc, u_int32_t bits)
 out:
 	if ((bits & ATW_NAR_ST) != 0)
 		atw_txdrain(sc);
-	splx(s);
+	crit_leave();
 	return;
 }
 
@@ -4015,13 +4015,13 @@ atw_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ifreq *ifr = (struct ifreq *)data;
    	struct ifaddr *ifa = (struct ifaddr *)data;
-	int s, error = 0;
+	int error = 0;
 
 	/* XXX monkey see, monkey do. comes from wi_ioctl. */
 	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
 		return ENXIO;
 
-	s = splnet();
+	crit_enter();
 
 	switch (cmd) {
         case SIOCSIFADDR:
@@ -4076,7 +4076,7 @@ atw_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	if (ATW_IS_ENABLED(sc))
 		atw_start(ifp);
 
-	splx(s);
+	crit_leave();
 	return (error);
 }
 

@@ -942,7 +942,7 @@ ep_media_status(struct ifnet *ifp, struct ifmediareq *req)
 
 /*
  * Start outputting on the interface.
- * Always called as splnet().
+ * Always called as crit_enter().
  */
 void
 epstart(struct ifnet *ifp)
@@ -1348,7 +1348,7 @@ epget(struct ep_softc *sc, int totlen)
 	struct mbuf *m;
 	int len, pad, off, sh, rxreg;
 
-	splassert(IPL_NET);
+	CRIT_ASSERT();
 
 	m = sc->mb[sc->next_mb];
 	sc->mb[sc->next_mb] = NULL;
@@ -1423,9 +1423,9 @@ epioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ep_softc *sc = ifp->if_softc;
 	struct ifaddr *ifa = (struct ifaddr *)data;
 	struct ifreq *ifr = (struct ifreq *)data;
-	int s, error = 0;
+	int error = 0;
 
-	s = splnet();
+	crit_enter();
 
 	switch (cmd) {
 	case SIOCSIFADDR:
@@ -1484,18 +1484,16 @@ epioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 	return (error);
 }
 
 void
 epreset(struct ep_softc *sc)
 {
-	int s;
-
-	s = splnet();
+	crit_enter();
 	epinit(sc);
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -1630,9 +1628,9 @@ void
 epmbuffill(void *v)
 {
 	struct ep_softc *sc = v;
-	int s, i;
+	int i;
 
-	s = splnet();
+	crit_enter();
 	for (i = 0; i < MAX_MBS; i++) {
 		if (sc->mb[i] == NULL) {
 			sc->mb[i] = MCLGETI(NULL, M_DONTWAIT, NULL, MCLBYTES);
@@ -1643,15 +1641,15 @@ epmbuffill(void *v)
 	/* If the queue was not filled, try again. */
 	if (i < MAX_MBS)
 		timeout_add(&sc->sc_epmbuffill_tmo, 1);
-	splx(s);
+	crit_leave();
 }
 
 void
 epmbufempty(struct ep_softc *sc)
 {
-	int s, i;
+	int i;
 
-	s = splnet();
+	crit_enter();
 	for (i = 0; i<MAX_MBS; i++) {
 		if (sc->mb[i]) {
 			m_freem(sc->mb[i]);
@@ -1660,7 +1658,7 @@ epmbufempty(struct ep_softc *sc)
 	}
 	sc->next_mb = 0;
 	timeout_del(&sc->sc_epmbuffill_tmo);
-	splx(s);
+	crit_leave();
 }
 
 void

@@ -336,9 +336,9 @@ int wb_mii_readreg(sc, frame)
 	struct wb_mii_frame	*frame;
 	
 {
-	int			i, ack, s;
+	int			i, ack;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Set up frame for RX.
@@ -417,7 +417,7 @@ fail:
 	SIO_SET(WB_SIO_MII_CLK);
 	DELAY(1);
 
-	splx(s);
+	crit_leave();
 
 	if (ack)
 		return(1);
@@ -432,9 +432,7 @@ int wb_mii_writereg(sc, frame)
 	struct wb_mii_frame	*frame;
 	
 {
-	int			s;
-
-	s = splnet();
+	crit_enter();
 	/*
 	 * Set up frame for TX.
 	 */
@@ -468,7 +466,7 @@ int wb_mii_writereg(sc, frame)
 	 */
 	SIO_CLR(WB_SIO_MII_DIR);
 
-	splx(s);
+	crit_leave();
 
 	return(0);
 }
@@ -1184,11 +1182,10 @@ wb_tick(xsc)
 	void *xsc;
 {
 	struct wb_softc *sc = xsc;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	mii_tick(&sc->sc_mii);
-	splx(s);
+	crit_leave();
 	timeout_add_sec(&sc->wb_tick_tmo, 1);
 }
 
@@ -1386,9 +1383,9 @@ void wb_init(xsc)
 {
 	struct wb_softc *sc = xsc;
 	struct ifnet *ifp = &sc->arpcom.ac_if;
-	int s, i;
+	int i;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
@@ -1438,7 +1435,7 @@ void wb_init(xsc)
 		printf("%s: initialization failed: no "
 			"memory for rx buffers\n", sc->sc_dev.dv_xname);
 		wb_stop(sc);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1489,7 +1486,7 @@ void wb_init(xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 
 	timeout_set(&sc->wb_tick_tmo, wb_tick, sc);
 	timeout_add_sec(&sc->wb_tick_tmo, 1);
@@ -1536,9 +1533,9 @@ int wb_ioctl(ifp, command, data)
 	struct wb_softc		*sc = ifp->if_softc;
 	struct ifaddr		*ifa = (struct ifaddr *) data;
 	struct ifreq		*ifr = (struct ifreq *) data;
-	int			s, error = 0;
+	int			error = 0;
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -1580,7 +1577,7 @@ int wb_ioctl(ifp, command, data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 	return(error);
 }
 

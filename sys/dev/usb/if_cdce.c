@@ -159,7 +159,6 @@ cdce_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct cdce_softc		*sc = (struct cdce_softc *)self;
 	struct usb_attach_arg		*uaa = aux;
-	int				 s;
 	struct ifnet			*ifp;
 	struct usbd_device		*dev = uaa->device;
 	const struct cdce_type		*t;
@@ -315,7 +314,7 @@ cdce_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 found:
-	s = splnet();
+	crit_enter();
 
 	if (!ethd || usbd_get_string_desc(sc->cdce_udev, ethd->iMacAddress, 0,
 	    &eaddr_str, &len)) {
@@ -360,7 +359,7 @@ found:
 	ether_ifattach(ifp);
 
 	sc->cdce_attached = 1;
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -518,12 +517,12 @@ cdce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct cdce_softc	*sc = ifp->if_softc;
 	struct ifaddr		*ifa = (struct ifaddr *)data;
-	int			 s, error = 0;
+	int			 error = 0;
 
 	if (usbd_is_dying(sc->cdce_udev))
 		return (EIO);
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -556,7 +555,7 @@ cdce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	if (error == ENETRESET)
 		error = 0;
 
-	splx(s);
+	crit_leave();
 	return (error);
 }
 
@@ -579,9 +578,9 @@ cdce_init(void *xsc)
 	struct ifnet		*ifp = GET_IFP(sc);
 	struct cdce_chain	*c;
 	usbd_status		 err;
-	int			 s, i;
+	int			 i;
 
-	s = splnet();
+	crit_enter();
 
 	if (sc->cdce_intr_no != -1 && sc->cdce_intr_pipe == NULL) {
 		DPRINTFN(1, ("cdce_init: establish interrupt pipe\n"));
@@ -592,20 +591,20 @@ cdce_init(void *xsc)
 		if (err) {
 			printf("%s: open interrupt pipe failed: %s\n",
 			    sc->cdce_dev.dv_xname, usbd_errstr(err));
-			splx(s);
+			crit_leave();
 			return;
 		}
 	}
 
 	if (cdce_tx_list_init(sc) == ENOBUFS) {
 		printf("%s: tx list init failed\n", sc->cdce_dev.dv_xname);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
 	if (cdce_rx_list_init(sc) == ENOBUFS) {
 		printf("%s: rx list init failed\n", sc->cdce_dev.dv_xname);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -616,7 +615,7 @@ cdce_init(void *xsc)
 	if (err) {
 		printf("%s: open rx pipe failed: %s\n", sc->cdce_dev.dv_xname,
 		    usbd_errstr(err));
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -625,7 +624,7 @@ cdce_init(void *xsc)
 	if (err) {
 		printf("%s: open tx pipe failed: %s\n", sc->cdce_dev.dv_xname,
 		    usbd_errstr(err));
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -640,7 +639,7 @@ cdce_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -737,7 +736,6 @@ cdce_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct ifnet		*ifp = GET_IFP(sc);
 	struct mbuf		*m;
 	int			 total_len = 0;
-	int			 s;
 
 	if (usbd_is_dying(sc->cdce_udev) || !(ifp->if_flags & IFF_RUNNING))
 		return;
@@ -781,7 +779,7 @@ cdce_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	m->m_pkthdr.len = m->m_len = total_len;
 	m->m_pkthdr.rcvif = ifp;
 
-	s = splnet();
+	crit_enter();
 
 	if (cdce_newbuf(sc, c, NULL) == ENOBUFS) {
 		ifp->if_ierrors++;
@@ -796,7 +794,7 @@ cdce_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	ether_input_mbuf(ifp, m);
 
 done1:
-	splx(s);
+	crit_leave();
 
 done:
 	/* Setup new transfer. */
@@ -813,19 +811,18 @@ cdce_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct cdce_softc	*sc = c->cdce_sc;
 	struct ifnet		*ifp = GET_IFP(sc);
 	usbd_status		 err;
-	int			 s;
 
 	if (usbd_is_dying(sc->cdce_udev))
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	ifp->if_timer = 0;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
 	if (status != USBD_NORMAL_COMPLETION) {
 		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
-			splx(s);
+			crit_leave();
 			return;
 		}
 		ifp->if_oerrors++;
@@ -833,7 +830,7 @@ cdce_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		    usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall_async(sc->cdce_bulkout_pipe);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -852,7 +849,7 @@ cdce_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		cdce_start(ifp);
 
-	splx(s);
+	crit_leave();
 }
 
 int

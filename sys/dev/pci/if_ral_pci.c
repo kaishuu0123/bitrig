@@ -31,6 +31,7 @@
 #include <sys/malloc.h>
 #include <sys/timeout.h>
 #include <sys/device.h>
+#include <sys/proc.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -249,9 +250,8 @@ void
 ral_pci_wakeup(struct ral_pci_softc *psc)
 {
 	struct rt2560_softc *sc = &psc->sc_sc;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	(*psc->sc_opns->wakeup)(sc);
-	splx(s);
+	crit_leave();
 }

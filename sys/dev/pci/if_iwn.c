@@ -33,6 +33,7 @@
 #include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/task.h>
+#include <sys/proc.h>
 
 #include <machine/bus.h>
 #include <machine/endian.h>
@@ -746,9 +747,8 @@ iwn_init_task(void *arg1, void *arg2)
 {
 	struct iwn_softc *sc = arg1;
 	struct ifnet *ifp = &sc->sc_ic.ic_if;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	while (sc->sc_flags & IWN_FLAG_BUSY)
 		tsleep(&sc->sc_flags, 0, "iwnpwr", 0);
 	sc->sc_flags |= IWN_FLAG_BUSY;
@@ -758,7 +758,7 @@ iwn_init_task(void *arg1, void *arg2)
 
 	sc->sc_flags &= ~IWN_FLAG_BUSY;
 	wakeup(&sc->sc_flags);
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -1766,9 +1766,8 @@ iwn_calib_timeout(void *arg)
 {
 	struct iwn_softc *sc = arg;
 	struct ieee80211com *ic = &sc->sc_ic;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	if (ic->ic_fixed_rate == -1) {
 		if (ic->ic_opmode == IEEE80211_M_STA)
 			iwn_iter_func(sc, ic->ic_bss);
@@ -1784,7 +1783,7 @@ iwn_calib_timeout(void *arg)
 		    sizeof flags, 1);
 		sc->calib_cnt = 0;
 	}
-	splx(s);
+	crit_leave();
 
 	/* Automatic rate control triggered every 500ms. */
 	timeout_add_msec(&sc->calib_to, 500);
@@ -3082,9 +3081,9 @@ iwn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ifaddr *ifa;
 	struct ifreq *ifr;
-	int s, error = 0;
+	int error = 0;
 
-	s = splnet();
+	crit_enter();
 	/*
 	 * Prevent processes from entering this function while another
 	 * process is tsleep'ing in it.
@@ -3092,7 +3091,7 @@ iwn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	while ((sc->sc_flags & IWN_FLAG_BUSY) && error == 0)
 		error = tsleep(&sc->sc_flags, PCATCH, "iwnioc", 0);
 	if (error != 0) {
-		splx(s);
+		crit_leave();
 		return error;
 	}
 	sc->sc_flags |= IWN_FLAG_BUSY;
@@ -3158,7 +3157,7 @@ iwn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	sc->sc_flags &= ~IWN_FLAG_BUSY;
 	wakeup(&sc->sc_flags);
-	splx(s);
+	crit_leave();
 	return error;
 }
 

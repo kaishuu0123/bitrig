@@ -31,6 +31,7 @@
 #include <sys/malloc.h>
 #include <sys/timeout.h>
 #include <sys/device.h>
+#include <sys/proc.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -229,15 +230,14 @@ athn_pci_wakeup(struct athn_pci_softc *psc)
 {
 	struct athn_softc *sc = &psc->sc_sc;
 	pcireg_t reg;
-	int s;
 
 	reg = pci_conf_read(psc->sc_pc, psc->sc_tag, 0x40);
 	if (reg & 0xff00)
 		pci_conf_write(psc->sc_pc, psc->sc_tag, 0x40, reg & ~0xff00);
 
-	s = splnet();
+	crit_enter();
 	athn_wakeup(sc);
-	splx(s);
+	crit_leave();
 }
 
 uint32_t

@@ -197,7 +197,7 @@ main(void *framep)
 	struct process *pr;
 	struct pdevinit *pdev;
 	quad_t lim;
-	int s, i;
+	int i;
 	extern struct pdevinit pdevinit[];
 	extern void disk_init(void);
 
@@ -408,11 +408,9 @@ main(void *framep)
 	 * Initialize protocols.  Block reception of incoming packets
 	 * until everything is ready.
 	 */
-	s = splnet();
 	netisr_init();
 	domaininit();
 	if_attachdomain();
-	splx(s);
 
 #ifdef GPROF
 	/* Initialize kernel profiling. */

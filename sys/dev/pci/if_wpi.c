@@ -33,6 +33,7 @@
 #include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/task.h>
+#include <sys/proc.h>
 
 #include <machine/bus.h>
 #include <machine/endian.h>
@@ -422,9 +423,8 @@ wpi_init_task(void *arg1, void *args2)
 {
 	struct wpi_softc *sc = arg1;
 	struct ifnet *ifp = &sc->sc_ic.ic_if;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	while (sc->sc_flags & WPI_FLAG_BUSY)
 		tsleep(&sc->sc_flags, 0, "wpipwr", 0);
 	sc->sc_flags |= WPI_FLAG_BUSY;
@@ -434,7 +434,7 @@ wpi_init_task(void *arg1, void *args2)
 
 	sc->sc_flags &= ~WPI_FLAG_BUSY;
 	wakeup(&sc->sc_flags);
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -1101,9 +1101,8 @@ wpi_calib_timeout(void *arg)
 {
 	struct wpi_softc *sc = arg;
 	struct ieee80211com *ic = &sc->sc_ic;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	/* Automatic rate control triggered every 500ms. */
 	if (ic->ic_fixed_rate == -1) {
 		if (ic->ic_opmode == IEEE80211_M_STA)
@@ -1117,7 +1116,7 @@ wpi_calib_timeout(void *arg)
 		wpi_power_calibration(sc);
 		sc->calib_cnt = 0;
 	}
-	splx(s);
+	crit_leave();
 
 	/* Automatic rate control triggered every 500ms. */
 	timeout_add_msec(&sc->calib_to, 500);
@@ -1986,9 +1985,9 @@ wpi_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ifaddr *ifa;
 	struct ifreq *ifr;
-	int s, error = 0;
+	int error = 0;
 
-	s = splnet();
+	crit_enter();
 	/*
 	 * Prevent processes from entering this function while another
 	 * process is tsleep'ing in it.
@@ -1996,7 +1995,7 @@ wpi_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	while ((sc->sc_flags & WPI_FLAG_BUSY) && error == 0)
 		error = tsleep(&sc->sc_flags, PCATCH, "wpiioc", 0);
 	if (error != 0) {
-		splx(s);
+		crit_leave();
 		return error;
 	}
 	sc->sc_flags |= WPI_FLAG_BUSY;
@@ -2061,7 +2060,7 @@ wpi_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	sc->sc_flags &= ~WPI_FLAG_BUSY;
 	wakeup(&sc->sc_flags);
-	splx(s);
+	crit_leave();
 	return error;
 }
 
