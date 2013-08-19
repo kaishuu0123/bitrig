@@ -974,7 +974,7 @@ uvm_map(struct vm_map *map, vaddr_t *addr, vsize_t sz,
 	vaddr_t			 hint;
 
 	if ((map->flags & VM_MAP_INTRSAFE) == 0)
-		splassert(IPL_NONE);
+		CRIT_ASSERT();
 
 	/*
 	 * We use pmap_align and pmap_offset as alignment and offset variables.
@@ -1819,7 +1819,7 @@ uvm_unmap_remove(struct vm_map *map, vaddr_t start, vaddr_t end,
 	if ((map->flags & VM_MAP_INTRSAFE) == 0)
 		splassert(IPL_NONE);
 	else
-		splassert(IPL_VM);
+		CRIT_ASSERT();
 
 	/*
 	 * Find first affected entry.
