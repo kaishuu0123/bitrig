@@ -728,8 +728,6 @@ injournal(struct buf *bp)
 void
 bdwrite(struct buf *bp)
 {
-	int s;
-
 	/* If this is a tape block, write the block now. */
 	if (major(bp->b_dev) < nblkdev &&
 	    bdevsw[major(bp->b_dev)].d_type == D_TAPE) {

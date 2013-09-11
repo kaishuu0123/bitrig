@@ -827,7 +827,6 @@ ststrategy(struct buf *bp)
 {
 	struct scsi_link *sc_link;
 	struct st_softc *st;
-	int s;
 
 	st = stlookup(STUNIT(bp->b_dev));
 	if (st == NULL) {

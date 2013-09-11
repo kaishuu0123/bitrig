@@ -591,10 +591,9 @@ static char *x86_ipi_names[X86_NIPI] = X86_IPI_NAMES;
 void
 cpu_intr_init(struct cpu_info *ci)
 {
-	struct intrsource *isp;
-
 #if NLAPIC > 0
 #ifdef MULTIPROCESSOR
+	struct intrsource *isp;
 	isp = malloc(sizeof (struct intrsource), M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (isp == NULL)
 		panic("can't allocate fixed interrupt source");
