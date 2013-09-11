@@ -2553,9 +2553,9 @@ pfkeyv2_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 	case NET_KEY_SADB_DUMP:
 		if ((error = suser(curproc, 0)) != 0)
 			return (error);
-		s = splsoftnet();
+		crit_enter();
 		error = tdb_walk(rdomain, pfkeyv2_sysctl_walker, &w);
-		splx(s);
+		crit_leave();
 		if (oldp)
 			*oldlenp = (int8_t *)w.w_where - (int8_t *)oldp;
 		else
@@ -2563,10 +2563,10 @@ pfkeyv2_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 		break;
 
 	case NET_KEY_SPD_DUMP:
-		s = splsoftnet();
+		crit_enter();
 		error = pfkeyv2_ipo_walk(rdomain,
 		    pfkeyv2_sysctl_policydumper, &w);
-		splx(s);
+		crit_leave();
 		if (oldp)
 			*oldlenp = (int8_t *)w.w_where - (int8_t *)oldp;
 		else
