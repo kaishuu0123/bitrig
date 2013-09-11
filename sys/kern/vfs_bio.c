@@ -1227,7 +1227,7 @@ buf_daemon(struct proc *p)
 #else
 				wapbl_flush(mp->mnt_wapbl, 1);
 #endif
-				s = splbio();
+				crit_enter();
 				continue;
 			}
 #endif /* WAPBL */

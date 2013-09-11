@@ -232,9 +232,8 @@ void
 viomb_worker(void *arg1, void *arg2)
 {
 	struct viomb_softc *sc = (struct viomb_softc *)arg1;
-	int s;
 
-	s = splbio();
+	crit_enter();
 	viomb_read_config(sc);
 	if (sc->sc_npages > sc->sc_actual){
 		VIOMBDEBUG(sc, "inflating balloon from %u to %u.\n",
@@ -246,7 +245,7 @@ viomb_worker(void *arg1, void *arg2)
 		VIOMBDEBUG(sc, "deflating balloon from %u to %u.\n",
 			   sc->sc_actual, sc->sc_npages);
 	}
-	splx(s);
+	crit_leave();
 }
 
 void

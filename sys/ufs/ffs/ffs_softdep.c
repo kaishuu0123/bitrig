@@ -435,9 +435,9 @@ softdep_freequeue_add(struct worklist *item)
 {
 	int s;
 
-	s = splbio();
+	crit_enter();
 	LIST_INSERT_HEAD(&softdep_freequeue, item, wk_list);
-	splx(s);
+	crit_leave();
 }
 
 static __inline void

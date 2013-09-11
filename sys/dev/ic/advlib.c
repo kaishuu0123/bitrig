@@ -225,8 +225,6 @@ static void AscAsyncFix(ASC_SOFTC *, u_int8_t, ASC_SCSI_INQUIRY *);
 static int AscCompareString(u_char *, u_char *, int);
 		
 /* Device oriented routines */
-static int DvcEnterCritical(void);
-static void DvcLeaveCritical(int);
 static void DvcSleepMilliSecond(u_int32_t);
 //static void DvcDelayMicroSecond(u_int32_t);
 static void DvcDelayNanoSecond(u_int32_t);
@@ -2822,10 +2820,9 @@ AscRiscHaltedAbortCCB(ASC_SOFTC *sc, u_int32_t ccb)
 	ASC_QDONE_INFO  scsiq_buf;
 	ASC_QDONE_INFO *scsiq;
 	ASC_ISR_CALLBACK asc_isr_callback;
-	int             last_int_level;
 
 	asc_isr_callback = (ASC_ISR_CALLBACK) sc->isr_callback;
-	last_int_level = DvcEnterCritical();
+	crit_enter();
 	scsiq = (ASC_QDONE_INFO *) & scsiq_buf;
 
 	for (q_no = ASC_MIN_ACTIVE_QNO; q_no <= sc->max_total_qng; q_no++) {
@@ -2843,13 +2840,13 @@ AscRiscHaltedAbortCCB(ASC_SOFTC *sc, u_int32_t ccb)
 				AscWriteLramByte(iot, ioh, q_addr + ASC_SCSIQ_B_STATUS,
 						 scsiq->q_status);
 				(*asc_isr_callback) (sc, scsiq);
-				DvcLeaveCritical(last_int_level);
+				crit_leave();
 				return (1);
 			}
 		}
 	}
 
-	DvcLeaveCritical(last_int_level);
+	crit_leave();
 	return (0);
 }
 
@@ -2864,10 +2861,9 @@ AscRiscHaltedAbortTIX(ASC_SOFTC *sc, u_int8_t target_ix)
 	ASC_QDONE_INFO  scsiq_buf;
 	ASC_QDONE_INFO *scsiq;
 	ASC_ISR_CALLBACK asc_isr_callback;
-	int             last_int_level;
 
 	asc_isr_callback = (ASC_ISR_CALLBACK) sc->isr_callback;
-	last_int_level = DvcEnterCritical();
+	crit_enter();
 	scsiq = (ASC_QDONE_INFO *) & scsiq_buf;
 	for (q_no = ASC_MIN_ACTIVE_QNO; q_no <= sc->max_total_qng; q_no++) {
 		q_addr = ASC_QNO_TO_QADDR(q_no);
@@ -2885,7 +2881,7 @@ AscRiscHaltedAbortTIX(ASC_SOFTC *sc, u_int8_t target_ix)
 			}
 		}
 	}
-	DvcLeaveCritical(last_int_level);
+	crit_enter();
 	return (1);
 }
 
@@ -3151,23 +3147,6 @@ AscCompareString(u_char *str1, u_char *str2, int len)
 /******************************************************************************/
 /*                            Device oriented routines                        */
 /******************************************************************************/
-
-
-static int
-DvcEnterCritical(void)
-{
-	int             s;
-
-	s = splbio();
-	return (s);
-}
-
-
-static void
-DvcLeaveCritical(int s)
-{
-	splx(s);
-}
 
 
 static void

@@ -560,7 +560,7 @@ wapbl_discard(struct wapbl *wl)
 {
 	struct wapbl_entry *we;
 	struct buf *bp;
-	int i, s;
+	int i;
 
 	/*
 	 * XXX we may consider using upgrade here
@@ -632,7 +632,7 @@ wapbl_discard(struct wapbl *wl)
 	/*
 	 * clean buffer list
 	 */
-	s = splbio();
+	crit_enter();
 	mtx_enter(&wl->wl_mtx);
 	while ((bp = LIST_FIRST(&wl->wl_bufs)) != NULL) {
 		if (wapbl_bbusy(bp, &wl->wl_mtx) == 0) {
@@ -646,7 +646,7 @@ wapbl_discard(struct wapbl *wl)
 		}
 	}
 	mtx_leave(&wl->wl_mtx);
-	splx(s);
+	crit_leave();
 
 	/*
 	 * Remove references to this wl from wl_entries, free any which
@@ -731,15 +731,15 @@ int
 wapbl_doio(void *data, size_t len, struct vnode *devvp, daddr_t pbn, int flags)
 {
 	struct buf *bp;
-	int error, s;
+	int error;
 
 	KASSERT((flags & ~(B_WRITE | B_READ)) == 0);
 	KASSERT(devvp->v_type == VBLK);
 
 	if ((flags & (B_WRITE | B_READ)) == B_WRITE) {
-		s = splbio();
+		crit_enter();
 		devvp->v_numoutput++;
-		splx(s);
+		crit_leave();
 		curproc->p_ru.ru_oublock++;
 		bcstats.pendingwrites++;
 		bcstats.numwrites++;
@@ -777,10 +777,10 @@ wapbl_doio(void *data, size_t len, struct vnode *devvp, daddr_t pbn, int flags)
 		    len, pbn, devvp->v_rdev, error));
 	}
 
-	s = splbio();
+	crit_enter();
 	bp->b_vp = NULL;
 	brelse(bp);
-	splx(s);
+	crit_leave();
 
 	return error;
 }
@@ -1456,7 +1456,7 @@ wapbl_flush(struct wapbl *wl, int waitfor)
 	size_t delta = 0;
 	size_t flushsize;
 	size_t reserved;
-	int error = 0, s;
+	int error = 0;
 
 	/*
 	 * Do a quick check to see if a full flush can be skipped
@@ -1590,7 +1590,7 @@ wapbl_flush(struct wapbl *wl, int waitfor)
 #endif
 
 
-	s = splbio();
+	crit_enter();
 	mtx_enter(&wl->wl_mtx);
 
 	wl->wl_reserved_bytes = reserved;
@@ -1628,13 +1628,13 @@ wapbl_flush(struct wapbl *wl, int waitfor)
 		bremfree(bp);
 		wapbl_remove_buf_locked(wl, bp);
 		mtx_leave(&wl->wl_mtx);
-		splx(s);
+		crit_leave();
 		bawrite(bp);
-		s = splbio();
+		crit_enter();
 		mtx_enter(&wl->wl_mtx);
 	}
 	mtx_leave(&wl->wl_mtx);
-	splx(s);
+	crit_leave();
 
 #if 0
 	WAPBL_PRINTF(WAPBL_PRINT_FLUSH,

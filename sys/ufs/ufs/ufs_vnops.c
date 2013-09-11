@@ -1770,9 +1770,9 @@ ufs_strategy(void *v)
 
 	error = WAPBL_REPLAY_READ(mp, bp->b_data, bp->b_blkno, bp->b_bcount);
 	if (error) {
-		s = splbio();
+		crit_enter();
 		SET(bp->b_flags, B_INVAL);
-		splx(s);
+		crit_leave();
 	}
 
 	return (error);

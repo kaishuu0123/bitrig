@@ -1882,9 +1882,9 @@ int
 vtruncbuf(struct vnode *vp, daddr_t lbn, int slpflag, int slptimeo)
 {
 	struct buf *bp, *nbp;
-	int s, error;
+	int error;
 
-	s = splbio();
+	crit_enter();
 restart:
 	for (bp = LIST_FIRST(&vp->v_cleanblkhd); bp; bp = nbp) {
 		nbp = LIST_NEXT(bp, b_vnbufs);
@@ -1895,7 +1895,7 @@ restart:
 			error = tsleep(bp, slpflag | (PRIBIO + 1),
 			    "vtruncbuf", slptimeo);
 			if (error) {
-				splx(s);
+				crit_leave();
 				return (error);
 			}
 			goto restart;
@@ -1915,7 +1915,7 @@ restart:
 			error = tsleep(bp, slpflag | (PRIBIO + 1),
 			    "vtruncbuf", slptimeo);
 			if (error) {
-				splx(s);
+				crit_leave();
 				return (error);
 			}
 			goto restart;
@@ -1926,7 +1926,7 @@ restart:
 		brelse(bp);
 	}
 
-	splx(s);
+	crit_leave();
 
 	return (0);
 }

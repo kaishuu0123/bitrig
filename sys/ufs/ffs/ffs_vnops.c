@@ -526,19 +526,19 @@ ffs_wapbl_fsync_full(void *v)
 	 * Don't flush the log if the vnode being flushed contains no dirty
 	 * buffers that could be in the log.
 	 */
-	s = splbio();
+	crit_enter();
 	if (!LIST_EMPTY(&vp->v_dirtyblkhd)) {
-		splx(s);
+		crit_leave()
 		error = wapbl_flush(mp->mnt_wapbl, 0);
 		if (error)
 			return (error);
-		s = splbio();
+		crit_enter();
 	}
 
 	if (waitfor == MNT_WAIT)
 		error = vwaitforio(vp, 0, "wapblfsy", 0);
 
-	splx(s);
+	crit_leave();
 
 	return (error);
 }
@@ -552,7 +552,7 @@ ffs_wapbl_fsync(void *v)
 	struct mount *mp = vp->v_mount;
 	struct buf *bp, *nbp;
 	int waitfor = ap->a_waitfor;
-	int s, error;
+	int error;
 
 	KASSERT(vp->v_type == VREG);
 	KASSERT(mp->mnt_wapbl != NULL);
@@ -561,7 +561,7 @@ ffs_wapbl_fsync(void *v)
 	 * Flush all data blocks.
 	 */
 loop:
-	s = splbio();
+	crit_enter();
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd);
 	    bp != LIST_END(&vp->v_dirtyblkhd); bp = nbp) {
 		nbp = LIST_NEXT(bp, b_vnbufs);
@@ -573,7 +573,7 @@ loop:
 #endif
 		bremfree(bp);
 		buf_acquire(bp);
-		splx(s);
+		crit_leave();
 		bawrite(bp);
 		goto loop;
 	}
@@ -581,12 +581,12 @@ loop:
 	if (waitfor == MNT_WAIT) {
 		error = vwaitforio(vp, 0, "wapblsy", 0);
 		if (error) {
-			splx(s);
+			crit_leave();
 			return (error);
 		}
 	}
 
-	splx(s);
+	crit_leave();
 
 	/*
 	 * Don't bother writing out metadata if the syncer is making the
@@ -616,15 +616,15 @@ loop:
 int
 ffs_wapbl_fsync_vfs(struct vnode *vp, int waitfor)
 {
-	int s, error = 0;
+	int error = 0;
 
 	KASSERT(vp->v_type == VBLK);
 	KASSERT(vp->v_specmountpoint != NULL);
 	KASSERT(vp->v_specmountpoint->mnt_wapbl != NULL);
 
 #ifdef DIAGNOSTIC
-	s = splbio();
 	struct buf *bp, *nbp;
+	crit_enter();
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd);
 	    bp != LIST_END(&vp->v_dirtyblkhd); bp = nbp) {
 		nbp = LIST_NEXT(bp, b_vnbufs);
@@ -632,7 +632,7 @@ ffs_wapbl_fsync_vfs(struct vnode *vp, int waitfor)
 			panic("ffs_wapbl_fsync_vfs: non-WAPBL buffer %p "
 			    "on vnode %p", bp, vp);
 	}
-	splx(s);
+	crit_leave();
 #endif
 
 	/*
@@ -647,20 +647,20 @@ ffs_wapbl_fsync_vfs(struct vnode *vp, int waitfor)
 	 * Don't flush the log if the vnode being flushed contains no dirty
 	 * buffers that could be in the log.
 	 */
-	s = splbio();
+	crit_enter();
 	if (!LIST_EMPTY(&vp->v_dirtyblkhd)) {
 		struct mount *mp = vp->v_specmountpoint;
-		splx(s);
+		crit_leave();
 		error = wapbl_flush(mp->mnt_wapbl, 0);
 		if (error)
 			return (error);
-		s = splbio();
+		crit_enter();
 	}
 
 	if (waitfor == MNT_WAIT)
 		error = vwaitforio(vp, 0, "wapblvfs", 0);
 
-	splx(s);
+	crit_leave();
 
 	return (error);
 }
