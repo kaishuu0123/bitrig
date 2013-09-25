@@ -1093,12 +1093,11 @@ void
 pool_reclaim_all(void)
 {
 	struct pool	*pp;
-	int		s;
 
-	s = splhigh();
+	crit_enter();
 	SIMPLEQ_FOREACH(pp, &pool_head, pr_poollist)
 		pool_reclaim(pp);
-	splx(s);
+	crit_leave();
 }
 
 #ifdef DDB
