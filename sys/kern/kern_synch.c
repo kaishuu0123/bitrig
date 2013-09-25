@@ -208,8 +208,6 @@ sleep_setup(struct sleep_state *sls, const volatile void *ident, int prio,
 	sls->sls_do_sleep = 1;
 	sls->sls_sig = 1;
 
-	SCHED_LOCK(sls->sls_s);
-
 	p->p_wchan = ident;
 	p->p_wmesg = wmesg;
 	p->p_slptime = 0;
@@ -237,7 +235,6 @@ sleep_finish(struct sleep_state *sls, int do_sleep)
 #endif
 
 	p->p_cpu->ci_schedstate.spc_curpriority = p->p_usrpri;
-	SCHED_UNLOCK(sls->sls_s);
 
 	/*
 	 * Even though this belongs to the signal handling part of sleep,
@@ -330,9 +327,8 @@ void
 endtsleep(void *arg)
 {
 	struct proc *p = arg;
-	int s;
 
-	SCHED_LOCK(s);
+	SCHED_LOCK();
 	if (p->p_wchan) {
 		if (p->p_stat == SSLEEP)
 			setrunnable(p);
@@ -340,7 +336,7 @@ endtsleep(void *arg)
 			unsleep(p);
 		atomic_setbits_int(&p->p_flag, P_TIMEOUT);
 	}
-	SCHED_UNLOCK(s);
+	SCHED_UNLOCK();
 }
 
 /*
@@ -364,9 +360,8 @@ wakeup_n(const volatile void *ident, int n)
 	struct slpque *qp;
 	struct proc *p;
 	struct proc *pnext;
-	int s;
 
-	SCHED_LOCK(s);
+	SCHED_LOCK();
 	qp = &slpque[LOOKUP(ident)];
 	for (p = TAILQ_FIRST(qp); p != NULL && n != 0; p = pnext) {
 		pnext = TAILQ_NEXT(p, p_runq);
@@ -382,7 +377,7 @@ wakeup_n(const volatile void *ident, int n)
 				setrunnable(p);
 		}
 	}
-	SCHED_UNLOCK(s);
+	SCHED_UNLOCK();
 }
 
 /*

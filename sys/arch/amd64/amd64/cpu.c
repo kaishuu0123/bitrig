@@ -696,7 +696,6 @@ cpu_hatch(void *v)
 {
 	struct cpu_info *ci = (struct cpu_info *)v;
 	struct proc fakeproc;
-	int s;
 
 	cpu_init_msrs(ci);
 
@@ -756,7 +755,7 @@ cpu_hatch(void *v)
 	nanouptime(&ci->ci_schedstate.spc_runtime);
 	crit_leave();
 
-	SCHED_LOCK(s);
+	SCHED_LOCK();
 	cpu_switchto(NULL, curcpu()->ci_schedstate.spc_idleproc);
 }
 
