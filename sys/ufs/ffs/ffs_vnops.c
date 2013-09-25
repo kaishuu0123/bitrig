@@ -528,7 +528,7 @@ ffs_wapbl_fsync_full(void *v)
 	 */
 	crit_enter();
 	if (!LIST_EMPTY(&vp->v_dirtyblkhd)) {
-		crit_leave()
+		crit_leave();
 		error = wapbl_flush(mp->mnt_wapbl, 0);
 		if (error)
 			return (error);
