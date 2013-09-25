@@ -491,7 +491,7 @@ ffs_wapbl_fsync_full(void *v)
 	KASSERT(mp->mnt_wapbl != NULL);
 
 #ifdef DIAGNOSTIC
-	s = splbio();
+	crit_enter();
 	struct buf *bp, *nbp;
 	for (bp = LIST_FIRST(&vp->v_dirtyblkhd);
 	    bp != LIST_END(&vp->v_dirtyblkhd); bp = nbp) {
@@ -500,7 +500,7 @@ ffs_wapbl_fsync_full(void *v)
 			panic("ffs_wapbl_fsync_full: non-WAPBL buffer %p "
 			    "on vnode %p", bp, vp);
 	}
-	splx(s);
+	crit_leave();
 #endif
 
 	/*
