@@ -208,6 +208,8 @@ sleep_setup(struct sleep_state *sls, const volatile void *ident, int prio,
 	sls->sls_do_sleep = 1;
 	sls->sls_sig = 1;
 
+	SCHED_LOCK();
+
 	p->p_wchan = ident;
 	p->p_wmesg = wmesg;
 	p->p_slptime = 0;
@@ -235,6 +237,7 @@ sleep_finish(struct sleep_state *sls, int do_sleep)
 #endif
 
 	p->p_cpu->ci_schedstate.spc_curpriority = p->p_usrpri;
+	SCHED_UNLOCK();
 
 	/*
 	 * Even though this belongs to the signal handling part of sleep,
