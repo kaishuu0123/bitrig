@@ -327,6 +327,9 @@ IDTVEC(intr_lapic_ipi)
 	movl	CPUVAR(ILEVEL),%ebx
 	cmpl	$IPL_IPI,%ebx
 	jae	2f
+	movq	CPUVAR(CURPROC),%rax
+	testl	$-1,P_CRIT(%rax)
+	jnz	2f
 IDTVEC(resume_lapic_ipi)
 1:
 	incl	CPUVAR(IDEPTH)
@@ -473,9 +476,9 @@ IDTVEC(intr_##name##num)						;\
 	level_mask(num)							;\
 	incl	CPUVAR(IDEPTH)						;\
 	movq	%r14, %rdi						;\
+	sti								;\
 	call	_C_LABEL(ithread_run)					;\
 	late_ack(num)							;\
-	sti								;\
 	jmp	_C_LABEL(Xdoreti)	/* lower spl and do ASTs */	;\
 10:									\
 	cli								;\
