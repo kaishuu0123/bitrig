@@ -311,7 +311,6 @@ fpusave_proc(struct proc *p, int save)
 {
 	struct cpu_info *ci = curcpu();
 	struct cpu_info *oci;
-	u_int j = 0, i = 0;
 
 	KDASSERT(p->p_addr != NULL);
 
@@ -332,11 +331,9 @@ fpusave_proc(struct proc *p, int save)
 #ifdef DIAGNOSTIC
 			u_int j = 0, i = 0;
 			if ((++i % 10000000) == 0) {
-				printf("cpu %d -> cpu %d %s:%d kernel lock = cpu%d\n",
+				printf("cpu %d -> cpu %d %s:%d\n",
 				    curcpu()->ci_cpuid, oci->ci_cpuid,
-				    __func__, __LINE__,
-				    kernel_lock.mpl_cpu ?
-				    kernel_lock.mpl_cpu->ci_cpuid : -1);
+				    __func__, __LINE__);
 				if (++j == 20)
 					Debugger();
 
