@@ -151,7 +151,6 @@ int
 mtx_enter_try(struct mutex *mtx)
 {
 	struct cpu_info *ci = curcpu();
-	int s;
 
 #ifdef DIAGNOSTIC
 	if (__predict_false(mtx->mtx_owner == ci))
@@ -159,13 +158,8 @@ mtx_enter_try(struct mutex *mtx)
 #endif
 	crit_enter();
 
-	if (mtx->mtx_wantipl > IPL_CRIT)
-		s = splraise(mtx->mtx_wantipl);
-
 #ifdef MULTIPROCESSOR
 	if (atomic_cmpset_ptr(&mtx->mtx_owner, NULL, ci) == 0) {
-		if (mtx->mtx_wantipl > IPL_CRIT)
-			splx(s);
 		crit_leave();
 		return (0);
 	}
@@ -176,9 +170,6 @@ mtx_enter_try(struct mutex *mtx)
 #ifdef DIAGNOSTIC
 	ci->ci_mutex_level++;
 #endif
-
-	if (mtx->mtx_wantipl > IPL_CRIT)
-		mtx->mtx_oldipl = s;
 
 	return (1);
 }
@@ -194,20 +185,16 @@ void
 mtx_leave(struct mutex *mtx)
 {
 	struct cpu_info *ci = curcpu();
-	int s;
+
 #ifdef DIAGNOSTIC
 	if (__predict_false(mtx->mtx_owner != ci))
 		panic("mtx_leave: lock not held");
 #endif
-	if (mtx->mtx_wantipl != IPL_NONE)
-		s = mtx->mtx_oldipl;
 	/* XXX compiler fence here ? */
 	mtx->mtx_owner = NULL;
 #ifdef DIAGNOSTIC
 	ci->ci_mutex_level--;
 #endif
-	if (mtx->mtx_wantipl != IPL_NONE)
-		splx(s);
 
 	crit_leave();
 }
