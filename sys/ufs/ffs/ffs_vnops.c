@@ -485,7 +485,7 @@ ffs_wapbl_fsync_full(void *v)
 	struct inode *ip = VTOI(vp);
 	struct mount *mp = vp->v_mount;
 	int waitfor = ap->a_waitfor;
-	int s, error = 0;
+	int error = 0;
 
 	KASSERT(vp->v_type != VREG);
 	KASSERT(mp->mnt_wapbl != NULL);
