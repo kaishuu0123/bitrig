@@ -1096,7 +1096,7 @@ hibernate_block_io(union hibernate_info *hib, daddr_t blkctr,
 void
 hibernate_resume(void)
 {
-	union hibernate_info hiber_info;
+	union hibernate_info hib;
 
 	/* Get current running machine's hibernate info */
 	bzero(&hib, sizeof(hib));
@@ -1115,7 +1115,7 @@ hibernate_resume(void)
 	    hib.sig_offset,
 	    DEV_BSIZE, (vaddr_t)&disk_hib, 0)) {
 		DPRINTF("error in hibernate read");
-		splx(s);
+		crit_leave();
 		return;
 	}
 

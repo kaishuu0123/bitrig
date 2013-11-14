@@ -1122,9 +1122,8 @@ if_link_state_change_task(void *arg, void *unused)
 {
 	unsigned int index = (unsigned long)arg;
 	struct ifnet *ifp;
-	int s;
 
-	s = splsoftnet();
+	crit_enter();
 	if ((ifp = if_get(index)) != NULL) {
 		rt_ifmsg(ifp);
 #ifndef SMALL_KERNEL
@@ -1132,7 +1131,7 @@ if_link_state_change_task(void *arg, void *unused)
 #endif
 		dohooks(ifp->if_linkstatehooks, 0);
 	}
-	splx(s);
+	crit_leave();
 }
 
 /*
@@ -1653,9 +1652,9 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 	}
 	/* If we took down the IF, bring it back */
 	if (up) {
-		s = splnet();
+		crit_enter();
 		if_up(ifp);
-		splx(s);
+		crit_leave();
 	}
 	return (error);
 }

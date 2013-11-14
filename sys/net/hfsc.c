@@ -51,6 +51,7 @@
 #include <sys/errno.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -261,7 +262,7 @@ hfsc_class_create(struct hfsc_if *hif, struct hfsc_sc *rsc,
     int qlimit, int flags, int qid)
 {
 	struct hfsc_class *cl, *p;
-	int i, s;
+	int i;
 
 	if (hif->hif_classes >= HFSC_MAX_CLASSES)
 		return (NULL);
@@ -328,7 +329,7 @@ hfsc_class_create(struct hfsc_if *hif, struct hfsc_sc *rsc,
 	cl->cl_hif = hif;
 	cl->cl_parent = parent;
 
-	s = splnet();
+	crit_enter();
 	hif->hif_classes++;
 
 	/*
@@ -346,7 +347,7 @@ hfsc_class_create(struct hfsc_if *hif, struct hfsc_sc *rsc,
 				break;
 			}
 		if (i == HFSC_MAX_CLASSES) {
-			splx(s);
+			crit_leave();
 			goto err_ret;
 		}
 	}
@@ -366,7 +367,7 @@ hfsc_class_create(struct hfsc_if *hif, struct hfsc_sc *rsc,
 			p->cl_siblings = cl;
 		}
 	}
-	splx(s);
+	crit_leave();
 
 	return (cl);
 
@@ -394,7 +395,7 @@ err_ret:
 int
 hfsc_class_destroy(struct hfsc_class *cl)
 {
-	int i, s;
+	int i;
 
 	if (cl == NULL)
 		return (0);
@@ -402,7 +403,7 @@ hfsc_class_destroy(struct hfsc_class *cl)
 	if (cl->cl_children != NULL)
 		return (EBUSY);
 
-	s = splnet();
+	crit_enter();
 
 	if (cl->cl_q->qlen > 0)
 		hfsc_purgeq(cl);
@@ -427,7 +428,7 @@ hfsc_class_destroy(struct hfsc_class *cl)
 		}
 
 	cl->cl_hif->hif_classes--;
-	splx(s);
+	crit_leave();
 
 	hfsc_actlist_destroy(cl->cl_actc);
 
@@ -614,12 +615,11 @@ void
 hfsc_deferred(void *arg)
 {
 	struct ifnet *ifp = arg;
-	int s;
 
-	s = splnet();
+	crit_enter();
 	if (HFSC_ENABLED(&ifp->if_snd) && !IFQ_IS_EMPTY(&ifp->if_snd))
 		if_start(ifp);
-	splx(s);
+	crit_leave();
 
 	/* XXX HRTIMER nearest virtual/fit time is likely less than 1/HZ. */
 	timeout_add(&ifp->if_snd.ifq_hfsc->hif_defer, 1);
