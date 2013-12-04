@@ -488,7 +488,7 @@ void
 igmp_leavegroup(struct in_multi *inm)
 {
 
-	int s = splsoftnet();
+	crit_enter();
 
 	switch (inm->inm_state) {
 	case IGMP_DELAYING_MEMBER:
@@ -505,7 +505,7 @@ igmp_leavegroup(struct in_multi *inm)
 	case IGMP_SLEEPING_MEMBER:
 		break;
 	}
-	splx(s);
+	crit_leave();
 }
 
 void

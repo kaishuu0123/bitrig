@@ -147,7 +147,7 @@ mld6_start_listening(struct in6_multi *in6m)
 void
 mld6_stop_listening(struct in6_multi *in6m)
 {
-	int s = splsoftnet();
+	crit_enter();
 
 	mld_all_nodes_linklocal.s6_addr16[1] =
 	    htons(in6m->in6m_ifp->if_index); /* XXX */
@@ -159,7 +159,7 @@ mld6_stop_listening(struct in6_multi *in6m)
 	    __IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) > __IPV6_ADDR_SCOPE_INTFACELOCAL)
 		mld6_sendpkt(in6m, MLD_LISTENER_DONE,
 		    &mld_all_routers_linklocal);
-	splx(s);
+	crit_leave();
 }
 
 void

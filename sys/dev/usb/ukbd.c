@@ -56,6 +56,7 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/ioctl.h>
+#include <sys/proc.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbhid.h>

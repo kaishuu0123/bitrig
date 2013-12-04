@@ -4748,14 +4748,14 @@ sppp_update_ip6_addr(void *arg1, void *arg2)
 	struct in6_aliasreq *ifra = arg2;
 	struct in6_addr mask = in6mask128;
 	struct in6_ifaddr *ia;
-	int s, error;
+	int error;
 
-	s = splnet();
+	crit_enter();
 
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
 	if (ia == NULL) {
 		/* IPv6 disabled? */
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -4773,7 +4773,7 @@ sppp_update_ip6_addr(void *arg1, void *arg2)
 		    "could not update IPv6 address (error %d)\n",
 		    SPP_ARGS(ifp), error);
 	}
-	splx(s);
+	crit_leave();
 }
 
 /*

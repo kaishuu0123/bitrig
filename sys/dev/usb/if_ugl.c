@@ -60,6 +60,7 @@
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
+#include <sys/proc.h>
 
 #include <sys/device.h>
 
@@ -226,7 +227,6 @@ ugl_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct ugl_softc	*sc = (struct ugl_softc *)self;
 	struct usb_attach_arg	*uaa = aux;
-	int			s;
 	struct usbd_device	*dev = uaa->device;
 	struct usbd_interface	*iface;
 	usbd_status		err;
@@ -285,7 +285,7 @@ ugl_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	s = splnet();
+	crit_enter();
 
 	macaddr_hi = htons(0x2acb);
 	bcopy(&macaddr_hi, &sc->sc_arpcom.ac_enaddr[0], sizeof(u_int16_t));
@@ -311,7 +311,7 @@ ugl_attach(struct device *parent, struct device *self, void *aux)
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -319,11 +319,10 @@ ugl_detach(struct device *self, int flags)
 {
 	struct ugl_softc	*sc = (struct ugl_softc *)self;
 	struct ifnet		*ifp = GET_IFP(sc);
-	int			s;
 
 	DPRINTFN(2,("%s: %s: enter\n", sc->sc_dev.dv_xname, __func__));
 
-	s = splusb();
+	crit_enter();
 
 	if (ifp->if_flags & IFF_RUNNING)
 		ugl_stop(sc);
@@ -339,7 +338,7 @@ ugl_detach(struct device *self, int flags)
 		       sc->sc_dev.dv_xname);
 #endif
 
-	splx(s);
+	crit_leave();
 
 	return (0);
 }
@@ -468,7 +467,6 @@ ugl_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct mbuf		*m;
 	int			total_len = 0;
 	unsigned int		packet_len, packet_count;
-	int			s;
 
 	if (usbd_is_dying(sc->sc_udev))
 		return;
@@ -529,7 +527,7 @@ ugl_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 
 	m->m_pkthdr.rcvif = ifp;
 
-	s = splnet();
+	crit_enter();
 
 	/* XXX ugly */
 	if (ugl_newbuf(sc, c, NULL) == ENOBUFS) {
@@ -555,7 +553,7 @@ ugl_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	ether_input_mbuf(ifp, m);
 
  done1:
-	splx(s);
+	crit_leave();
 
  done:
 	/* Setup new transfer. */
@@ -578,12 +576,11 @@ ugl_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct ugl_chain	*c = priv;
 	struct ugl_softc	*sc = c->ugl_sc;
 	struct ifnet		*ifp = GET_IFP(sc);
-	int			s;
 
 	if (usbd_is_dying(sc->sc_udev))
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", sc->sc_dev.dv_xname,
 		    __func__, status));
@@ -593,7 +590,7 @@ ugl_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 
 	if (status != USBD_NORMAL_COMPLETION) {
 		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
-			splx(s);
+			crit_leave();
 			return;
 		}
 		ifp->if_oerrors++;
@@ -601,7 +598,7 @@ ugl_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		    usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall_async(sc->sc_ep[UGL_ENDPT_TX]);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -613,7 +610,7 @@ ugl_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		ugl_start(ifp);
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -704,32 +701,31 @@ ugl_init(void *xsc)
 {
 	struct ugl_softc	*sc = xsc;
 	struct ifnet		*ifp = GET_IFP(sc);
-	int			s;
 
 	if (usbd_is_dying(sc->sc_udev))
 		return;
 
 	DPRINTFN(10,("%s: %s: enter\n", sc->sc_dev.dv_xname,__func__));
 
-	s = splnet();
+	crit_enter();
 
 	/* Init TX ring. */
 	if (ugl_tx_list_init(sc) == ENOBUFS) {
 		printf("%s: tx list init failed\n", sc->sc_dev.dv_xname);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
 	/* Init RX ring. */
 	if (ugl_rx_list_init(sc) == ENOBUFS) {
 		printf("%s: rx list init failed\n", sc->sc_dev.dv_xname);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
 	if (sc->sc_ep[UGL_ENDPT_RX] == NULL) {
 		if (ugl_openpipes(sc)) {
-			splx(s);
+			crit_leave();
 			return;
 		}
 	}
@@ -737,7 +733,7 @@ ugl_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -828,7 +824,7 @@ ugl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct ugl_softc	*sc = ifp->if_softc;
 	struct ifaddr 		*ifa = (struct ifaddr *)data;
-	int			s, error = 0;
+	int			error = 0;
 
 	if (usbd_is_dying(sc->sc_udev))
 		return (EIO);
@@ -836,7 +832,7 @@ ugl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	DPRINTFN(5,("%s: %s: cmd=0x%08lx\n",
 		    sc->sc_dev.dv_xname, __func__, command));
 
-	s = splnet();
+	crit_enter();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -869,7 +865,7 @@ ugl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	if (error == ENETRESET)
 		error = 0;
 
-	splx(s);
+	crit_leave();
 	return (error);
 }
 
