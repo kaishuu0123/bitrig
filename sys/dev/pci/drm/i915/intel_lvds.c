@@ -481,25 +481,25 @@ static int intel_lvds_get_modes(struct drm_connector *connector)
 	return 1;
 }
 
-static int intel_no_modeset_on_lid_dmi_callback(const struct dmi_system_id *id)
-{
-	printf("Skipping forced modeset for %s\n", id->ident);
-	return 1;
-}
+//static int intel_no_modeset_on_lid_dmi_callback(const struct dmi_system_id *id)
+//{
+//	printf("Skipping forced modeset for %s\n", id->ident);
+//	return 1;
+//}
 
 /* The GPU hangs up on these systems if modeset is performed on LID open */
-static const struct dmi_system_id intel_no_modeset_on_lid[] = {
-	{
-		.callback = intel_no_modeset_on_lid_dmi_callback,
-		.ident = "Toshiba Tecra A11",
-		.matches = {
-			DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
-			DMI_MATCH(DMI_PRODUCT_NAME, "TECRA A11"),
-		},
-	},
-
-	{ }	/* terminating entry */
-};
+//static const struct dmi_system_id intel_no_modeset_on_lid[] = {
+//	{
+//		.callback = intel_no_modeset_on_lid_dmi_callback,
+//		.ident = "Toshiba Tecra A11",
+//		.matches = {
+//			DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+//			DMI_MATCH(DMI_PRODUCT_NAME, "TECRA A11"),
+//		},
+//	},
+//
+//	{ }	/* terminating entry */
+//};
 
 #ifdef notyet
 /*

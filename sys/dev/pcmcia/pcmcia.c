@@ -59,10 +59,10 @@ int	pcmcia_activate(struct device *, int);
 int	pcmcia_print(void *, const char *);
 void	pcmcia_card_detach_notify(struct device *, void *);
 
-static inline void pcmcia_socket_enable(pcmcia_chipset_tag_t,
-					     pcmcia_chipset_handle_t *);
-static inline void pcmcia_socket_disable(pcmcia_chipset_tag_t,
-					      pcmcia_chipset_handle_t *);
+//static inline void pcmcia_socket_enable(pcmcia_chipset_tag_t,
+//					     pcmcia_chipset_handle_t *);
+//static inline void pcmcia_socket_disable(pcmcia_chipset_tag_t,
+//					      pcmcia_chipset_handle_t *);
 
 int pcmcia_card_intr(void *);
 
@@ -411,19 +411,19 @@ pcmcia_function_init(pf, cfe)
 	pf->cfe = cfe;
 }
 
-static inline void pcmcia_socket_enable(pct, pch)
-     pcmcia_chipset_tag_t pct;
-     pcmcia_chipset_handle_t *pch;
-{
-	pcmcia_chip_socket_enable(pct, pch);
-}
+//static inline void pcmcia_socket_enable(pct, pch)
+//     pcmcia_chipset_tag_t pct;
+//     pcmcia_chipset_handle_t *pch;
+//{
+//	pcmcia_chip_socket_enable(pct, pch);
+//}
 
-static inline void pcmcia_socket_disable(pct, pch)
-     pcmcia_chipset_tag_t pct;
-     pcmcia_chipset_handle_t *pch;
-{
-	pcmcia_chip_socket_disable(pct, pch);
-}
+//static inline void pcmcia_socket_disable(pct, pch)
+//     pcmcia_chipset_tag_t pct;
+//     pcmcia_chipset_handle_t *pch;
+//{
+//	pcmcia_chip_socket_disable(pct, pch);
+//}
 
 /* Enable a PCMCIA function */
 int

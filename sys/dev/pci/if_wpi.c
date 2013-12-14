@@ -506,13 +506,13 @@ wpi_mem_read(struct wpi_softc *sc, uint32_t addr)
 	return WPI_READ(sc, WPI_MEM_RDATA);
 }
 
-static __inline void  
-wpi_mem_write(struct wpi_softc *sc, uint32_t addr, uint32_t data)
-{
-	WPI_WRITE(sc, WPI_MEM_WADDR, addr);
-	WPI_BARRIER_WRITE(sc);
-	WPI_WRITE(sc, WPI_MEM_WDATA, data);
-}
+//static __inline void  
+//wpi_mem_write(struct wpi_softc *sc, uint32_t addr, uint32_t data)
+//{
+//	WPI_WRITE(sc, WPI_MEM_WADDR, addr);
+//	WPI_BARRIER_WRITE(sc);
+//	WPI_WRITE(sc, WPI_MEM_WDATA, data);
+//}
 
 static __inline void
 wpi_mem_read_region_4(struct wpi_softc *sc, uint32_t addr, uint32_t *data,

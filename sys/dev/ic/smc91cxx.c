@@ -186,17 +186,17 @@ void	smc91cxx_resume(struct smc91cxx_softc *);
 void	smc91cxx_watchdog(struct ifnet *);
 int	smc91cxx_ioctl(struct ifnet *, u_long, caddr_t);
 
-static __inline int ether_cmp(void *, void *);
-static __inline int
-ether_cmp(va, vb)
-	void *va, *vb;
-{
-	u_int8_t *a = va;
-	u_int8_t *b = vb;
-
-	return ((a[5] != b[5]) || (a[4] != b[4]) || (a[3] != b[3]) ||
-		(a[2] != b[2]) || (a[1] != b[1]) || (a[0] != b[0]));
-}
+//static __inline int ether_cmp(void *, void *);
+//static __inline int
+//ether_cmp(va, vb)
+//	void *va, *vb;
+//{
+//	u_int8_t *a = va;
+//	u_int8_t *b = vb;
+//
+//	return ((a[5] != b[5]) || (a[4] != b[4]) || (a[3] != b[3]) ||
+//		(a[2] != b[2]) || (a[1] != b[1]) || (a[0] != b[0]));
+//}
 
 void
 smc91cxx_attach(sc, myea)
