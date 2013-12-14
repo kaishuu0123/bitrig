@@ -30,6 +30,7 @@
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
+#include <sys/proc.h>
 
 #include <sys/device.h>
 
@@ -666,7 +667,7 @@ axen_attach(struct device *parent, struct device *self, void *aux)
 	u_char			 eaddr[ETHER_ADDR_LEN];
 	char			*devname = sc->axen_dev.dv_xname;
 	struct ifnet		*ifp;
-	int			 i, s;
+	int			 i;
 
 	sc->axen_unit = self->dv_unit; /*device_get_unit(self);*/
 	sc->axen_udev = dev;
@@ -724,7 +725,7 @@ axen_attach(struct device *parent, struct device *self, void *aux)
 		}
 	}
 
-	s = splnet();
+	crit_enter();
 
 	sc->axen_phyno = AXEN_PHY_ID;
 	DPRINTF((" get_phyno %d\n", sc->axen_phyno));
@@ -796,14 +797,13 @@ axen_attach(struct device *parent, struct device *self, void *aux)
 
 	timeout_set(&sc->axen_stat_ch, axen_tick, sc);
 
-	splx(s);
+	crit_leave();
 }
 
 int
 axen_detach(struct device *self, int flags)
 {
 	struct axen_softc	*sc = (struct axen_softc *)self;
-	int			s;
 	struct ifnet		*ifp = GET_IFP(sc);
 
 	DPRINTFN(2,("%s: %s: enter\n", sc->axen_dev.dv_xname, __func__));
@@ -825,7 +825,7 @@ axen_detach(struct device *self, int flags)
 	usb_rem_task(sc->axen_udev, &sc->axen_tick_task);
 	usb_rem_task(sc->axen_udev, &sc->axen_stop_task);
 
-	s = splusb();
+	crit_enter();
 
 	if (--sc->axen_refcnt >= 0) {
 		/* Wait for processes to go away */
@@ -854,7 +854,7 @@ axen_detach(struct device *self, int flags)
 		/* Wait for processes to go away. */
 		usb_detach_wait(&sc->axen_dev);
 	}
-	splx(s);
+	crit_leave();
 
 	return 0;
 }
@@ -976,7 +976,6 @@ axen_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	u_int16_t		hdr_offset, pkt_count;
 	size_t			pkt_len;
 	size_t			temp;
-	int			s;
 
 	DPRINTFN(10,("%s: %s: enter\n", sc->axen_dev.dv_xname,__func__));
 
@@ -1100,13 +1099,13 @@ axen_rxeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		memcpy(mtod(m, char *), buf + 2, pkt_len - 2);
 
 		/* push the packet up */
-		s = splnet();
+		crit_enter();
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m, BPF_DIRECTION_IN);
 #endif
 		ether_input_mbuf(ifp, m);
-		splx(s);
+		crit_leave();
 
 nextpkt:
 		/*
@@ -1144,7 +1143,6 @@ axen_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	struct axen_softc	*sc;
 	struct axen_chain	*c;
 	struct ifnet		*ifp;
-	int			s;
 
 	c = priv;
 	sc = c->axen_sc;
@@ -1153,11 +1151,11 @@ axen_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	if (usbd_is_dying(sc->axen_udev))
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	if (status != USBD_NORMAL_COMPLETION) {
 		if (status == USBD_NOT_STARTED || status == USBD_CANCELLED) {
-			splx(s);
+			crit_leave();
 			return;
 		}
 		ifp->if_oerrors++;
@@ -1165,7 +1163,7 @@ axen_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		    usbd_errstr(status));
 		if (status == USBD_STALLED)
 			usbd_clear_endpoint_stall_async(sc->axen_ep[AXEN_ENDPT_TX]);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1179,7 +1177,7 @@ axen_txeof(struct usbd_xfer *xfer, void *priv, usbd_status status)
 		axen_start(ifp);
 
 	ifp->if_opackets++;
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -1203,7 +1201,6 @@ axen_tick(void *xsc)
 void
 axen_tick_task(void *xsc)
 {
-	int			s;
 	struct axen_softc	*sc;
 	struct ifnet		*ifp;
 	struct mii_data		*mii;
@@ -1221,14 +1218,14 @@ axen_tick_task(void *xsc)
 	if (mii == NULL)
 		return;
 
-	s = splnet();
+	crit_enter();
 
 	mii_tick(mii);
 	if (sc->axen_link == 0)
 		axen_miibus_statchg(&sc->axen_dev);
 	timeout_add_sec(&sc->axen_stat_ch, 1);
 
-	splx(s);
+	crit_leave();
 }
 
 int
@@ -1325,12 +1322,12 @@ axen_init(void *xsc)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct axen_chain	*c;
 	usbd_status		err;
-	int			i, s;
+	int			i;
 	uByte			bval;
 	uWord			wval;
 	uint16_t		rxmode;
 
-	s = splnet();
+	crit_enter();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
@@ -1344,14 +1341,14 @@ axen_init(void *xsc)
 	/* Init RX ring. */
 	if (axen_rx_list_init(sc) == ENOBUFS) {
 		printf("axen%d: rx list init failed\n", sc->axen_unit);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
 	/* Init TX ring. */
 	if (axen_tx_list_init(sc) == ENOBUFS) {
 		printf("axen%d: tx list init failed\n", sc->axen_unit);
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1373,7 +1370,7 @@ axen_init(void *xsc)
 	if (err) {
 		printf("axen%d: open rx pipe failed: %s\n",
 		    sc->axen_unit, usbd_errstr(err));
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1382,7 +1379,7 @@ axen_init(void *xsc)
 	if (err) {
 		printf("axen%d: open tx pipe failed: %s\n",
 		    sc->axen_unit, usbd_errstr(err));
-		splx(s);
+		crit_leave();
 		return;
 	}
 
@@ -1400,7 +1397,7 @@ axen_init(void *xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	splx(s);
+	crit_leave();
 
 	timeout_add_sec(&sc->axen_stat_ch, 1);
 	return;
@@ -1412,10 +1409,9 @@ axen_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct axen_softc	*sc = ifp->if_softc;
 	struct ifreq		*ifr = (struct ifreq *)data;
 	struct ifaddr		*ifa = (struct ifaddr *)data;
-	int			s;
 	int			error = 0;
 
-	s = splnet();
+	crit_enter();
 
 	switch(cmd) {
 	case SIOCSIFADDR:
@@ -1460,7 +1456,7 @@ axen_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 	}
 
-	splx(s);
+	crit_leave();
 
 	return error;
 }
@@ -1471,21 +1467,20 @@ axen_watchdog(struct ifnet *ifp)
 	struct axen_softc	*sc;
 	struct axen_chain	*c;
 	usbd_status		stat;
-	int			s;
 
 	sc = ifp->if_softc;
 
 	ifp->if_oerrors++;
 	printf("axen%d: watchdog timeout\n", sc->axen_unit);
 
-	s = splusb();
+	crit_enter();
 	c = &sc->axen_cdata.axen_tx_chain[0];
 	usbd_get_xfer_status(c->axen_xfer, NULL, NULL, NULL, &stat);
 	axen_txeof(c->axen_xfer, c, stat);
 
 	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		axen_start(ifp);
-	splx(s);
+	crit_leave();
 }
 
 /*
