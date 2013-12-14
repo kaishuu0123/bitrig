@@ -54,7 +54,7 @@ char	*drm_get_connector_status_name(enum drm_connector_status);
 int	 drm_mode_group_init(struct drm_device *, struct drm_mode_group *);
 int	 drm_mode_handle_cmp(struct drm_mode_handle *, struct drm_mode_handle *);
 
-SPLAY_PROTOTYPE(drm_mode_tree, drm_mode_handle, entry, drm_mode_handle_cmp);
+SPLAY_PROTOTYPE_STATIC(drm_mode_tree, drm_mode_handle, entry, drm_mode_handle_cmp);
 
 /*
  * Global properties
@@ -3991,4 +3991,4 @@ drm_mode_handle_cmp(struct drm_mode_handle *a, struct drm_mode_handle *b)
 	return a->handle < b->handle ? -1 : a->handle > b->handle;
 }
 
-SPLAY_GENERATE(drm_mode_tree, drm_mode_handle, entry, drm_mode_handle_cmp);
+SPLAY_GENERATE_STATIC(drm_mode_tree, drm_mode_handle, entry, drm_mode_handle_cmp);

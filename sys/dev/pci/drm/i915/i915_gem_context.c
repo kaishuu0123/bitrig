@@ -101,7 +101,7 @@ i915_gem_context_get(struct drm_i915_file_private *file_priv, u32 id);
 static int do_switch(struct i915_hw_context *to);
 
 int i915_ctx_handle_cmp(struct i915_ctx_handle *, struct i915_ctx_handle *);
-SPLAY_PROTOTYPE(i915_ctx_tree, i915_ctx_handle, entry, i915_ctx_handle_cmp);
+SPLAY_PROTOTYPE_STATIC(i915_ctx_tree, i915_ctx_handle, entry, i915_ctx_handle_cmp);
 
 static int get_context_size(struct drm_device *dev)
 {
@@ -566,4 +566,4 @@ i915_ctx_handle_cmp(struct i915_ctx_handle *a, struct i915_ctx_handle *b)
         return a->handle < b->handle ? -1 : a->handle > b->handle;
 }
 
-SPLAY_GENERATE(i915_ctx_tree, i915_ctx_handle, entry, i915_ctx_handle_cmp);
+SPLAY_GENERATE_STATIC(i915_ctx_tree, i915_ctx_handle, entry, i915_ctx_handle_cmp);

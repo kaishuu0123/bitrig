@@ -75,7 +75,7 @@ int	 drm_setversion(struct drm_device *, void *, struct drm_file *);
 int	 drm_getmagic(struct drm_device *, void *, struct drm_file *);
 int	 drm_authmagic(struct drm_device *, void *, struct drm_file *);
 int	 drm_file_cmp(struct drm_file *, struct drm_file *);
-SPLAY_PROTOTYPE(drm_file_tree, drm_file, link, drm_file_cmp);
+SPLAY_PROTOTYPE_STATIC(drm_file_tree, drm_file, link, drm_file_cmp);
 
 /* functions used by the per-open handle  code to grab references to object */
 void	 drm_gem_object_handle_reference(struct drm_gem_object *);
@@ -88,8 +88,8 @@ int	 drm_fault(struct uvm_faultinfo *, vaddr_t, vm_page_t *, int, int,
 	     vm_fault_t, vm_prot_t, int);
 boolean_t	 drm_flush(struct uvm_object *, voff_t, voff_t, int);
 
-SPLAY_PROTOTYPE(drm_obj_tree, drm_handle, entry, drm_handle_cmp);
-SPLAY_PROTOTYPE(drm_name_tree, drm_gem_object, entry, drm_name_cmp);
+SPLAY_PROTOTYPE_STATIC(drm_obj_tree, drm_handle, entry, drm_handle_cmp);
+SPLAY_PROTOTYPE_STATIC(drm_name_tree, drm_gem_object, entry, drm_name_cmp);
 
 int	 drm_getcap(struct drm_device *, void *, struct drm_file *);
 
@@ -327,7 +327,7 @@ drm_file_cmp(struct drm_file *f1, struct drm_file *f2)
 	return (f1->minor < f2->minor ? -1 : f1->minor > f2->minor);
 }
 
-SPLAY_GENERATE(drm_file_tree, drm_file, link, drm_file_cmp);
+SPLAY_GENERATE_STATIC(drm_file_tree, drm_file, link, drm_file_cmp);
 
 struct drm_file *
 drm_find_file_by_minor(struct drm_device *dev, int minor)
@@ -1938,6 +1938,6 @@ drm_name_cmp(struct drm_gem_object *a, struct drm_gem_object *b)
 	return (a->name < b->name ? -1 : a->name > b->name);
 }
 
-SPLAY_GENERATE(drm_obj_tree, drm_handle, entry, drm_handle_cmp);
+SPLAY_GENERATE_STATIC(drm_obj_tree, drm_handle, entry, drm_handle_cmp);
 
-SPLAY_GENERATE(drm_name_tree, drm_gem_object, entry, drm_name_cmp);
+SPLAY_GENERATE_STATIC(drm_name_tree, drm_gem_object, entry, drm_name_cmp);
