@@ -77,7 +77,7 @@ ithread(void *v_is)
 		KASSERT(CRIT_DEPTH == 0);
 
 		if (stray)
-			printf("stray interrupt pin %d ?\n", is->is_pin);
+			DPRINTF(1, "stray interrupt pin %d ?\n", is->is_pin);
 
 		pic->pic_hwunmask(pic, is->is_pin);
 
