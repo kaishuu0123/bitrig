@@ -139,24 +139,6 @@ __mp_release_all(struct __mp_lock *mpl)
 	return (rv);
 }
 
-int
-__mp_release_all_but_one(struct __mp_lock *mpl)
-{
-	struct __mp_lock_cpu *cpu = &mpl->mpl_cpus[cpu_number()];
-	int rv = cpu->mplc_depth - 1;
-
-#ifdef MP_LOCKDEBUG
-	if (mpl->mpl_cpu != curcpu()) {
-		db_printf("__mp_release_all_but_one(%p): not held lock\n", mpl);
-		Debugger();
-	}
-#endif
-
-	cpu->mplc_depth = 1;
-
-	return (rv);
-}
-
 void
 __mp_acquire_count(struct __mp_lock *mpl, int count)
 {
