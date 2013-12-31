@@ -177,6 +177,7 @@ sched_idle(void *v)
 				atomic_setbits_int(&spc->spc_schedflags,
 				    spc->spc_whichqs ? 0 : SPCF_HALTED);
 				wakeup(spc);
+				SCHED_UNLOCK();
 			}
 			cpu_idle_cycle();
 		}
