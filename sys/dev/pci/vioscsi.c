@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/proc.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -214,9 +215,9 @@ vioscsi_scsi_cmd(struct scsi_xfer *xs)
 		nsegs += vr->vr_data->dm_nsegs;
 	}
 
-	int s = splbio();
+	crit_enter();
 	int r = virtio_enqueue_reserve(vq, slot, nsegs);
-	splx(s);
+	crit_leave();
 	if (r)
 		goto stuffup;
 
@@ -232,7 +233,7 @@ vioscsi_scsi_cmd(struct scsi_xfer *xs)
 		bus_dmamap_sync(vsc->sc_dmat, vr->vr_data, 0, xs->datalen,
 		    isread ? BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
 
-	s = splbio();
+	crit_enter();
 	virtio_enqueue_p(vq, slot, vr->vr_control,
 	    offsetof(struct vioscsi_req, vr_req),
             sizeof(struct virtio_scsi_req_hdr),
@@ -266,7 +267,7 @@ vioscsi_scsi_cmd(struct scsi_xfer *xs)
 		}
 		DPRINTF("vioscsi_scsi_cmd: done (timeout=%d)\n", timeout);
 	}
-	splx(s);
+	crit_leave();
 }
 
 void
@@ -322,10 +323,10 @@ vioscsi_vq_done(struct virtqueue *vq)
 	DPRINTF("vioscsi_vq_done: enter\n");
 
 	for (;;) {
-		int r, s, slot;
-		s = splbio();
+		int r, slot;
+		crit_enter();
 		r = virtio_dequeue(vsc, vq, &slot, NULL);
-		splx(s);
+		crit_leave();
 		if (r != 0)
 			break;
 
@@ -346,12 +347,12 @@ vioscsi_req_get(void *cookie)
 	struct virtio_softc *vsc = (struct virtio_softc *)sc->sc_dev.dv_parent;
 	struct virtqueue *vq = &sc->sc_vqs[2];
 	struct vioscsi_req *vr = NULL;
-	int r, s, slot;
+	int r, slot;
 
-	s = splbio();
+	crit_enter();
 	if (virtio_enqueue_prep(vq, &slot) == 0)
 		vr = &sc->sc_reqs[slot];
-	splx(s);
+	crit_leave();
 
 	if (vr == NULL)
 		goto err1;
@@ -384,9 +385,9 @@ err4:
 err3:
 	bus_dmamap_destroy(vsc->sc_dmat, vr->vr_control);
 err2:
-	s = splbio();
+	crit_enter();
 	virtio_enqueue_abort(vq, slot);
-	splx(s);
+	crit_leave();
 err1:
 	return (NULL);
 }
@@ -405,9 +406,9 @@ vioscsi_req_put(void *cookie, void *io)
 	bus_dmamap_destroy(vsc->sc_dmat, vr->vr_control);
 	bus_dmamap_destroy(vsc->sc_dmat, vr->vr_data);
 
-	int s = splbio();
+	crit_enter();
 	virtio_dequeue_commit(vq, slot);
-	splx(s);
+	crit_leave();
 }
 
 int
