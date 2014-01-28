@@ -1,6 +1,5 @@
 #	$OpenBSD: Makefile,v 1.54 2013/12/28 15:16:28 jsing Exp $
 
-CC=	gcc
 COPTS?=
 MAN=	boot.8
 MLINKS=	boot.8 boot.conf.5
@@ -88,4 +87,4 @@ CPPFLAGS+=-DHEAP_LIMIT=${HEAP_LIMIT} -I${S}/stand/boot #-DCOMPAT_UFS
 CFLAGS+=-m32 $(SACFLAGS) -D__INTERNAL_LIBSA_CREAD -fno-pie
 AFLAGS+=-m32 # -Wa,-R
 # AFLAGS+=-Wa,-a
-AFLAGS+=-fno-pie
+AFLAGS+=-fno-pie -no-integrated-as

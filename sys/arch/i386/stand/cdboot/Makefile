@@ -1,6 +1,5 @@
 #	$OpenBSD: Makefile,v 1.20 2013/12/28 02:51:07 deraadt Exp $
 
-CC=	gcc
 MAN=	cdboot.8
 
 .if ${MACHINE} == "i386"
@@ -73,4 +72,4 @@ CFLAGS+=-DKERNEL=\"/${OSREV}/${MACHINE}/bsd.rd\"
 CFLAGS+=-fno-pie
 #AFLAGS+=-Wa,-R
 # AFLAGS+=-Wa,-a
-AFLAGS+=-fno-pie
+AFLAGS+=-fno-pie -no-integrated-as

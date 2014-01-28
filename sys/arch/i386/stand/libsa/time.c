@@ -76,14 +76,15 @@ compute(int year, u_int8_t month, u_int8_t day, u_int8_t hour,
 static int
 bios_time_date(int f, u_int8_t *b)
 {
-	__asm __volatile(DOINT(0x1a) "\n\t"
+	__asm (DOINT(0x1a) "\n\t"
 	    "setc %b0\n\t"
 	    "movb %%ch, 0(%2)\n\t"
 	    "movb %%cl, 1(%2)\n\t"
 	    "movb %%dh, 2(%2)\n\t"
 	    "movb %%dl, 3(%2)\n\t"
 	    : "=a" (f)
-	    : "0" (f), "p" (b) : "%ecx", "%edx", "cc");
+	    : "0" (f), "r" (b)
+	    : "%ecx", "%edx", "cc");
 
 	if (f & 0xff)
 		return -1;
