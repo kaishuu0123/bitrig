@@ -64,6 +64,9 @@ platform_init_cons(void)
 	case BOARD_ID_IMX6_WANDBOARD:
 		paddr = 0x02020000;
 		break;
+	case BOARD_ID_IMX6_UDOO:
+		paddr = 0x021e8000;
+		break;
 	default:
 		printf("board type %x unknown", board_id);
 		return;
@@ -103,6 +106,10 @@ platform_print_board_type(void)
 	case BOARD_ID_IMX6_WANDBOARD:
 		amptimer_frequency = 396 * 1000 * 1000;
 		printf("board type: Wandboard\n");
+		break;
+	case BOARD_ID_IMX6_UDOO:
+		amptimer_frequency = 396 * 1000 * 1000;
+		printf("board type: UDOO\n");
 		break;
 	default:
 		printf("board type %x unknown\n", board_id);

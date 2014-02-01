@@ -57,6 +57,7 @@ extern struct board_dev hummingboard_devs[];
 extern struct board_dev sabrelite_devs[];
 extern struct board_dev utilite_devs[];
 extern struct board_dev wandboard_devs[];
+extern struct board_dev udoo_devs[];
 extern struct board_dev beagleboard_devs[];
 extern struct board_dev beaglebone_devs[];
 extern struct board_dev overo_devs[];
@@ -145,6 +146,11 @@ armv7_attach(struct device *parent, struct device *self, void *aux)
 		printf(": i.MX6 Wandboard\n");
 		imx6_init();
 		sc->sc_board_devs = wandboard_devs;
+		break;
+	case BOARD_ID_IMX6_UDOO:
+		printf(": i.MX6 UDOO\n");
+		imx6_init();
+		sc->sc_board_devs = udoo_devs;
 		break;
 #endif
 #if NOMAP > 0
