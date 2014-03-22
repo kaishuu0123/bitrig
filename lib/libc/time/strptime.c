@@ -103,7 +103,6 @@ _strptime(const char *buf, const char *fmt, struct tm *tm, int initialize,
 
 	struct lc_time_T *tptr = __get_current_time_locale(locale);
 
-
 	bp = (unsigned char *)buf;
 	while ((c = *fmt) != '\0') {
 		/* Clear `alternate' modifier prior to new conversion. */
@@ -228,7 +227,7 @@ literal:
 			_LEGAL_ALT(0);
 			for (i = 0; i < 12; i++) {
 				/* Full name. */
-				len = strlen(tptr->mon[i]);
+				len = strlen(tptr->month[i]);
 				if (strncasecmp_l(tptr->month[i], bp, len, locale) == 0)
 					break;
 
