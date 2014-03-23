@@ -743,6 +743,22 @@ arc4_reinit(void *v)
 	timeout_add_sec(&arc4_timeout, 10 * 60);
 }
 
+const u_int32_t * align32(const void *);
+
+const u_int32_t *
+align32(const void *p)
+{
+	/*
+	 * Return an aligned pointer for random data,
+	 * it drops some bytes, oops.
+	 */
+	
+	long v = (long) p;
+	v = (v & ~3) +
+	    ((v & (sizeof(u_int32_t) -1)) ? sizeof(u_int32_t) : 0);
+	return (u_int32_t *) v;
+}
+
 /*
  * Start periodic services inside the random subsystem, which pull
  * entropy forward, hash it, and re-seed the random stream as needed.
@@ -762,16 +778,16 @@ random_start(void)
 	rnd_states[RND_SRC_TRUE].max_entropy = 1;
 
 	/* Provide some data from this kernel */
-	add_entropy_words((u_int32_t *)version,
+	add_entropy_words(align32(version),
 	    strlen(version) / sizeof(u_int32_t));
 
 	/* Provide some data from this kernel */
-	add_entropy_words((u_int32_t *)cfdata,
+	add_entropy_words(align32(cfdata),
 	    8192 / sizeof(u_int32_t));
 
 	/* Message buffer may contain data from previous boot */
 	if (msgbufp->msg_magic == MSG_MAGIC)
-		add_entropy_words((u_int32_t *)msgbufp->msg_bufc,
+		add_entropy_words(align32(msgbufp->msg_bufc),
 		    msgbufp->msg_bufs / sizeof(u_int32_t));
 
 	rs_initialized = 1;
