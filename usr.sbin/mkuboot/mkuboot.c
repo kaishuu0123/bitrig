@@ -285,8 +285,11 @@ is_elf(int ifd, const char *iname)
 	nbytes = read(ifd, &ehdr, sizeof ehdr);
 	if (nbytes == -1)
 		err(1, "%s", iname);
-	if (nbytes != sizeof ehdr)
+	if (nbytes != sizeof ehdr) {
+		if (lseek(ifd, 0, SEEK_SET) != 0)
+			err(1, "%s", iname);
 		return 0;
+	}
 
 	if (lseek(ifd, 0, SEEK_SET) != 0)
 		err(1, "%s", iname);
