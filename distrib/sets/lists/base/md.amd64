@@ -1533,6 +1533,7 @@
 ./usr/libdata/perl5/site_perl/amd64-bitrig/miscfs/fuse
 ./usr/libdata/perl5/site_perl/amd64-bitrig/miscfs/fuse/fusefs.ph
 ./usr/libdata/perl5/site_perl/amd64-bitrig/miscfs/fuse/fusefs_node.ph
+./usr/libdata/perl5/site_perl/amd64-bitrig/monetary.ph
 ./usr/libdata/perl5/site_perl/amd64-bitrig/mpool.ph
 ./usr/libdata/perl5/site_perl/amd64-bitrig/msdosfs
 ./usr/libdata/perl5/site_perl/amd64-bitrig/msdosfs/bootsect.ph
