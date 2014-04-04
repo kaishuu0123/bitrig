@@ -1435,6 +1435,7 @@
 ./usr/include/miscfs/fuse
 ./usr/include/miscfs/fuse/fusefs.h
 ./usr/include/miscfs/fuse/fusefs_node.h
+./usr/include/monetary.h
 ./usr/include/mpool.h
 ./usr/include/msdosfs
 ./usr/include/msdosfs/bootsect.h
@@ -2000,7 +2001,7 @@
 ./usr/lib/libasn1.so.20.0
 ./usr/lib/libasn1_p.a
 ./usr/lib/libc.a
-./usr/lib/libc.so.74.0
+./usr/lib/libc.so.74.1
 ./usr/lib/libc_p.a
 ./usr/lib/libcom_err.a
 ./usr/lib/libcom_err.so.20.0
@@ -9416,6 +9417,8 @@
 ./usr/share/man/man3/strdup.3
 ./usr/share/man/man3/strerror.3
 ./usr/share/man/man3/strerror_r.3
+./usr/share/man/man3/strfmon.3
+./usr/share/man/man3/strfmon_l.3
 ./usr/share/man/man3/strftime.3
 ./usr/share/man/man3/string.3
 ./usr/share/man/man3/strlcat.3
