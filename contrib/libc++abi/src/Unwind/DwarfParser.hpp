@@ -295,7 +295,10 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
   // parse data alignment factor
   cieInfo->dataAlignFactor = (int)addressSpace.getSLEB128(p, cieContentEnd);
   // parse return address register
-  addressSpace.getULEB128(p, cieContentEnd);
+  if (version == 1)
+    p++;
+  else
+    addressSpace.getULEB128(p, cieContentEnd);
   // parse augmentation data based on augmentation string
   const char *result = NULL;
   if (addressSpace.get8(strStart) == 'z') {

@@ -167,6 +167,9 @@ inline LocalAddressSpace::pint_t LocalAddressSpace::getEncodedP(pint_t &addr,
   const uint8_t *p = (uint8_t *)addr;
   pint_t result;
 
+  if (encoding == DW_EH_PE_omit)
+    return 0;
+
   // first get value
   switch (encoding & 0x0F) {
   case DW_EH_PE_ptr:
@@ -196,12 +199,14 @@ inline LocalAddressSpace::pint_t LocalAddressSpace::getEncodedP(pint_t &addr,
     result = (pint_t)getSLEB128(addr, end);
     break;
   case DW_EH_PE_sdata2:
-    result = (uint16_t)get16(addr);
+    /* signed so that it extends negative numbers */
+    result = (int16_t)get16(addr);
     p += 2;
     addr = (pint_t) p;
     break;
   case DW_EH_PE_sdata4:
-    result = (uint32_t)get32(addr);
+    /* signed so that it extends negative numbers */
+    result = (int32_t)get32(addr);
     p += 4;
     addr = (pint_t) p;
     break;
@@ -287,6 +292,101 @@ inline LocalAddressSpace::pint_t LocalAddressSpace::getEncodedP(pint_t &addr,
   #endif
 #endif
 
+#if __Bitrig__
+  #include <link_elf.h>
+  #define PT_EH_FRAME_HDR (PT_LOOS + 0x474e550)
+
+  struct dl_unwind_sections
+  {
+    const Elf_Ehdr              *ehdr;
+    const void                  *dwarf_section;
+    uintptr_t                    dwarf_section_length;
+    const void                  *compact_unwind_section;
+    uintptr_t                    compact_unwind_section_length;
+  };
+
+  struct dl_iterate
+  {
+    const char                  *name;
+    const Elf_Phdr              *phdr;
+    Elf_Addr                     phaddr;
+    int                          phnum;
+  };
+
+  struct eh_frame_hdr
+  {
+    uint8_t version;
+    uint8_t eh_frame_ptr_enc;
+    uint8_t fde_count_enc;
+    uint8_t table_enc;
+    uint8_t data[0];
+  };
+
+  static int _dl_iterate_phdr_callback(struct dl_phdr_info *dlpi, size_t size,
+      void *data) {
+    dl_iterate *info = (dl_iterate *)data;
+    if (info->name == dlpi->dlpi_name || !strcmp(info->name, dlpi->dlpi_name)) {
+      info->phdr = dlpi->dlpi_phdr;
+      info->phaddr = dlpi->dlpi_addr;
+      info->phnum = dlpi->dlpi_phnum;
+      return 1;
+    }
+    return 0;
+  }
+  static inline bool _dl_find_unwind_sections(void *addr,
+      dl_unwind_sections *info) {
+
+    LocalAddressSpace::pint_t encoded, end;
+    struct eh_frame_hdr *ehfh;
+    uint8_t encoding;
+    struct dl_iterate di;
+    Elf_Phdr *phdr;
+    int idx;
+
+    // Find ELF containing address.
+    Dl_info dlinfo;
+    if (!dladdr(addr, &dlinfo))
+      return false;
+
+    // Find EH Frame Header in that ELF.
+    di.phdr = NULL;
+    di.phaddr = 0;
+    di.phnum = 0;
+    di.name = dlinfo.dli_fname;
+    dl_iterate_phdr(_dl_iterate_phdr_callback, &di);
+
+    if (di.phdr == NULL || di.phnum == 0)
+      return false;
+
+    phdr = (Elf_Phdr *)di.phdr;
+    for (idx = 0; idx < di.phnum; idx++, phdr++) {
+      if (phdr->p_type == PT_EH_FRAME_HDR)
+        break;
+    }
+
+    if (phdr->p_type != PT_EH_FRAME_HDR)
+      return false;
+
+
+    ehfh = (struct eh_frame_hdr *)(di.phaddr + phdr->p_vaddr);
+
+    encoded = (LocalAddressSpace::pint_t)&ehfh->data;
+    end = (LocalAddressSpace::pint_t)ehfh + phdr->p_memsz;
+    encoding = ehfh->eh_frame_ptr_enc;
+
+    // Fill in return struct.
+    info->ehdr = (Elf_Ehdr *)dlinfo.dli_fbase;
+    info->dwarf_section = (const void *)LocalAddressSpace::sThisAddressSpace
+        .getEncodedP(encoded, end, encoding);
+    /* XXX: We don't know how big it is, shouldn't be bigger than this. */
+    info->dwarf_section_length = 0x00ffffff;
+    info->compact_unwind_section = 0;
+    info->compact_unwind_section_length = 0;
+
+    return true;
+  }
+#endif
+
 inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
                                                   UnwindInfoSections &info) {
 #if __APPLE__
@@ -299,6 +399,18 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
  #endif
     info.compact_unwind_section        = (uintptr_t)dyldInfo.compact_unwind_section;
     info.compact_unwind_section_length = dyldInfo.compact_unwind_section_length;
+    return true;
+  }
+#elif __Bitrig__
+  dl_unwind_sections dlInfo;
+  if (_dl_find_unwind_sections((void *)targetAddr, &dlInfo)) {
+    info.dso_base                      = (uintptr_t)dlInfo.ehdr;
+ #if _LIBUNWIND_SUPPORT_DWARF_UNWIND
+    info.dwarf_section                 = (uintptr_t)dlInfo.dwarf_section;
+    info.dwarf_section_length          = dlInfo.dwarf_section_length;
+ #endif
+    info.compact_unwind_section        = (uintptr_t)dlInfo.compact_unwind_section;
+    info.compact_unwind_section_length = dlInfo.compact_unwind_section_length;
     return true;
   }
 #else
