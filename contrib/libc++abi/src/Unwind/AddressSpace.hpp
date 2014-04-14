@@ -298,19 +298,11 @@ inline LocalAddressSpace::pint_t LocalAddressSpace::getEncodedP(pint_t &addr,
 
   struct dl_unwind_sections
   {
-    const Elf_Ehdr              *ehdr;
+    uintptr_t                    base;
     const void                  *dwarf_section;
     uintptr_t                    dwarf_section_length;
     const void                  *compact_unwind_section;
     uintptr_t                    compact_unwind_section_length;
-  };
-
-  struct dl_iterate
-  {
-    const char                  *name;
-    const Elf_Phdr              *phdr;
-    Elf_Addr                     phaddr;
-    int                          phnum;
   };
 
   struct eh_frame_hdr
@@ -322,62 +314,54 @@ inline LocalAddressSpace::pint_t LocalAddressSpace::getEncodedP(pint_t &addr,
     uint8_t data[0];
   };
 
-  static int _dl_iterate_phdr_callback(struct dl_phdr_info *dlpi, size_t size,
-      void *data) {
-    dl_iterate *info = (dl_iterate *)data;
-    if (info->name == dlpi->dlpi_name || !strcmp(info->name, dlpi->dlpi_name)) {
-      info->phdr = dlpi->dlpi_phdr;
-      info->phaddr = dlpi->dlpi_addr;
-      info->phnum = dlpi->dlpi_phnum;
-      return 1;
+  struct _dl_iterate_struct
+  {
+    Elf_Addr			 addr;
+    Elf_Addr			 base;
+    Elf_Phdr			*eh_frame_hdr;
+  };
+
+  static int _dl_iterate_cb(struct dl_phdr_info *dlpi, size_t size, void* data) {
+    struct _dl_iterate_struct *dlis = (struct _dl_iterate_struct *)data;
+    Elf_Phdr *phdr = (Elf_Phdr *)dlpi->dlpi_phdr;
+    int idx, found = 0;
+
+    for (idx = 0; idx < dlpi->dlpi_phnum; idx++, phdr++) {
+      if (phdr->p_type == PT_LOAD) {
+        Elf_Addr vaddr = dlpi->dlpi_addr + phdr->p_vaddr;
+        if (dlis->addr >= vaddr && dlis->addr < (vaddr + phdr->p_memsz))
+          found = 1;
+      } else if (phdr->p_type == PT_EH_FRAME_HDR)
+        dlis->eh_frame_hdr = phdr;
     }
-    return 0;
+
+    dlis->base = dlpi->dlpi_addr;
+    return found;
   }
+
   static inline bool _dl_find_unwind_sections(void *addr,
       dl_unwind_sections *info) {
 
     LocalAddressSpace::pint_t encoded, end;
+    struct _dl_iterate_struct dlis;
     struct eh_frame_hdr *ehfh;
-    uint8_t encoding;
-    struct dl_iterate di;
     Elf_Phdr *phdr;
     int idx;
 
-    // Find ELF containing address.
-    Dl_info dlinfo;
-    if (!dladdr(addr, &dlinfo))
+    dlis.addr = (Elf_Addr)addr;
+    if (!dl_iterate_phdr(_dl_iterate_cb, &dlis))
       return false;
 
-    // Find EH Frame Header in that ELF.
-    di.phdr = NULL;
-    di.phaddr = 0;
-    di.phnum = 0;
-    di.name = dlinfo.dli_fname;
-    dl_iterate_phdr(_dl_iterate_phdr_callback, &di);
-
-    if (di.phdr == NULL || di.phnum == 0)
-      return false;
-
-    phdr = (Elf_Phdr *)di.phdr;
-    for (idx = 0; idx < di.phnum; idx++, phdr++) {
-      if (phdr->p_type == PT_EH_FRAME_HDR)
-        break;
-    }
-
-    if (phdr->p_type != PT_EH_FRAME_HDR)
-      return false;
-
-
-    ehfh = (struct eh_frame_hdr *)(di.phaddr + phdr->p_vaddr);
+    phdr = (Elf_Phdr *)dlis.eh_frame_hdr;
+    ehfh = (struct eh_frame_hdr *)(dlis.base + phdr->p_vaddr);
 
     encoded = (LocalAddressSpace::pint_t)&ehfh->data;
     end = (LocalAddressSpace::pint_t)ehfh + phdr->p_memsz;
-    encoding = ehfh->eh_frame_ptr_enc;
 
     // Fill in return struct.
-    info->ehdr = (Elf_Ehdr *)dlinfo.dli_fbase;
+    info->base = dlis.base;
     info->dwarf_section = (const void *)LocalAddressSpace::sThisAddressSpace
-        .getEncodedP(encoded, end, encoding);
+        .getEncodedP(encoded, end, ehfh->eh_frame_ptr_enc);
     /* XXX: We don't know how big it is, shouldn't be bigger than this. */
     info->dwarf_section_length = 0x00ffffff;
     info->compact_unwind_section = 0;
@@ -404,7 +388,7 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
 #elif __Bitrig__
   dl_unwind_sections dlInfo;
   if (_dl_find_unwind_sections((void *)targetAddr, &dlInfo)) {
-    info.dso_base                      = (uintptr_t)dlInfo.ehdr;
+    info.dso_base                      = (uintptr_t)dlInfo.base;
  #if _LIBUNWIND_SUPPORT_DWARF_UNWIND
     info.dwarf_section                 = (uintptr_t)dlInfo.dwarf_section;
     info.dwarf_section_length          = dlInfo.dwarf_section_length;
