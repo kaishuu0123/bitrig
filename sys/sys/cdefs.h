@@ -217,6 +217,12 @@
 #define	__pure
 #endif
 
+#if defined(__cplusplus) && __cplusplus >= 201103L
+#define _Noreturn               [[noreturn]]
+#else
+#define _Noreturn               __dead
+#endif
+
 /*
  * The __packed macro indicates that a variable or structure members
  * should have the smallest possible alignment, despite any host CPU
